@@ -47,5 +47,8 @@ def fetch_pdbs_from_uids(uniprot_ids, output_dir):
         download_file(url, output_dir + f"/{uid}.pdb")
 
 
+"""
+test:
 uids = extract_uids_from_fasta("example_files/combined.fasta")
 fetch_pdbs_from_uids(uids, "./PDBs")
+"""
