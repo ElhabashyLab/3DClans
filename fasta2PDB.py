@@ -39,6 +39,9 @@ def extract_uids_from_fasta(fasta_file):
 
 
 def fetch_pdbs_from_uids(uniprot_ids, output_dir):
+    """
+    Fetches and stores PDB files in a specified output directory with a given list of uniprot_ids.
+    """
     for uid in uniprot_ids:
         url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v4.pdb"
         download_file(url, output_dir + f"/{uid}.pdb")
