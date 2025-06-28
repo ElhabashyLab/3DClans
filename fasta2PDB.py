@@ -2,7 +2,25 @@ from Bio import SeqIO
 import requests
 
 
-def extract_UIDS_from_fasta(fasta_file):
+def download_file(url, output_path):
+    """
+    Downloads a file from a given URL and saves it to a specified local path.
+    """
+    try:
+        response = requests.get(url, stream=True, timeout=10)
+        # raise exception if request failed
+        response.raise_for_status()
+        with open(output_path, 'wb') as f:
+            # download file in 8KB chunks
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        return True
+    except Exception as e:
+        print(f"Failed to download {url}: {str(e)}")
+        return False
+
+
+def extract_uids_from_fasta(fasta_file):
     """
     Extract all UniProt IDs from Fasta file.
     All entries must contain a Uniprot_ID in the header.
@@ -14,32 +32,17 @@ def extract_UIDS_from_fasta(fasta_file):
         if "|" in header:
             uid = header.split("|")[1]
         else:
+            # if no '|' is found in header, the header is assumed to be the uid
             uid = header
         uids.append(uid)
     return uids
 
 
-def download_file(url, output_path):
-    """
-    Download a file from url to a output_path.
-    """
-    try:
-        response = requests.get(url, stream=True, timeout=10)
-        response.raise_for_status()
-        with open(output_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-        return True
-    except Exception as e:
-        print(f"Failed to download {url}: {str(e)}")
-        return False
+def fetch_pdbs_from_uids(uniprot_ids, output_dir):
+    for uid in uniprot_ids:
+        url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v4.pdb"
+        download_file(url, output_dir + f"/{uid}.pdb")
 
 
-def fetch_pdbs(uniprot_ids, output_dir):
-    urls = [f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v4.pdb" for uid in uniprot_ids]
-    for url in urls:
-        download_file(url, ...)
-
-
-
-print(extract_UIDS_from_fasta("example_files/example.fasta"))
+uids = extract_uids_from_fasta("example_files/combined.fasta")
+fetch_pdbs_from_uids(uids, "./PDBs")
