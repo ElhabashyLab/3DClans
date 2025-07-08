@@ -42,13 +42,20 @@ def fetch_pdbs_from_uids(uniprot_ids, output_dir):
     """
     Fetches and stores PDB files in a specified output directory with a given list of uniprot_ids.
     """
+    number_of_uids = len(uniprot_ids)
+    number_of_failed_downloads = 0
     for uid in uniprot_ids:
         url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v4.pdb"
-        download_file(url, output_dir + f"/{uid}.pdb")
+        if not download_file(url, output_dir + f"/{uid}.pdb"):
+            number_of_failed_downloads += 1
+    print(f"Downloaded {number_of_uids - number_of_failed_downloads} from {number_of_uids} PDB files successfully.")
 
 
 """
-test:
+example test:
 uids = extract_uids_from_fasta("example_files/combined.fasta")
 fetch_pdbs_from_uids(uids, "./PDBs")
 """
+
+
+
