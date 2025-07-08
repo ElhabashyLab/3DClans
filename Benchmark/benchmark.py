@@ -44,10 +44,6 @@ def set_up_tools():
     """
     tools = []
     # set up each tool by extending the Tool class
-    tmalign = TMalign("TM-align",
-                      "Tool for protein structure alignment using TM-score",
-                      "$TMalign")
-    tools.append(tmalign)
     return tools
 
 
