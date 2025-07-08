@@ -1,0 +1,7 @@
+biopython==1.83
+certifi==2025.6.15
+charset-normalizer==3.4.2
+idna==3.10
+numpy==1.24.4
+requests==2.32.4
+urllib3==2.2.3

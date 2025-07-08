@@ -1,5 +1,4 @@
 import cProfile
-import subprocess
 import os
 from fasta2PDB import *
 from TMalign import TMalign
