@@ -2,6 +2,7 @@ import cProfile
 import os
 from fasta2PDB import extract_uids_from_fasta, fetch_pdbs_from_uids
 from USalign import USalign
+from TMalign import TMalign
 """
 In this file/directory the performance of different alignment tools of protein structures is benchmarked:
     - US-align
@@ -19,8 +20,10 @@ class Benchmark:
         Sets up the benchmark environment by downloading PDB files from a given FASTA file.
         If 'run_with_PDBs_for_benchmark' is False, the 'fasta_file' is mandatory, and it will overwrite the PDB files
         in the PDBs_for_benchmark directory. If 'run_with_PDBs_for_benchmark' is True, it will run the benchmark with already downloaded PDB files.
+        In this case it does not matter if 'fasta_file' is given.
         """
-        self.tools = self.__set_up_tools()
+        self.tools = self._set_up_tools()
+        self.results = {}
         if run_with_PDBs_for_benchmark:
             # run test with already downloaded PDB files
             if not os.path.exists("PDBs_for_benchmark"):
@@ -35,7 +38,7 @@ class Benchmark:
             else:
                 print(f"Setting up benchmark environment with {fasta_file}...")
                 if os.path.exists("PDBs_for_benchmark"):
-                    self.__delete_dir_content("PDBs_for_benchmark")
+                    self._delete_dir_content("PDBs_for_benchmark")
                 else:
                     os.makedirs("PDBs_for_benchmark")
                 UIDS = extract_uids_from_fasta(fasta_file)
@@ -48,33 +51,30 @@ class Benchmark:
         """
         Runs the benchmark for each tool in self.tools on all PDB files in self.data directory.
         """
-        results = {}
         for tool in self.tools:
             print(f"Running benchmark for {tool.name}...")
             profiler = cProfile.Profile()
             profiler.enable()
-            score = tool.run(self.data)
+            scores = tool.run(self.data)
             profiler.disable()
-            results[tool.name] = {
-                'score': score,
-                'stats': profiler.getstats()
+            total_time = sum(stat.totaltime for stat in profiler.getstats())
+            self.results[tool.name] = {
+                'score': scores,
+                'total_time': total_time
             }
-            print(f"{tool.name} completed with score: {score}")
-        return results
+            print(f"{tool.name} completed in {total_time:.4f} seconds")
+        return self.results
 
 
-    def __set_up_tools(self):
+    def _set_up_tools(self):
         """
         Sets up the tools required for benchmarking.
         """
-        tools = []
-        # set up each tool by extending the StructSimTool class
-        usalign = USalign()
-        tools.append(usalign)
+        tools = [usalign := USalign(), tmalign := TMalign()]
         return tools
 
 
-    def __delete_dir_content(self, dir_path):
+    def _delete_dir_content(self, dir_path):
         """
         Deletes the content of the specified directory.
         """
@@ -93,7 +93,6 @@ class Benchmark:
 
 
 # test
-fasta_file = "./input/small_dataset.a2m"
-benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=True)
+fasta_file = "./example_files/small_fasta_files/small_dataset.a2m"
+benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=False)
 results = benchmark.run_benchmark()
-

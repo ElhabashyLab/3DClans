@@ -1,9 +1,11 @@
-from Benchmark.StructSimTool import StructSimTool
+from StructSimTool import StructSimTool
 """
-This class extends the Tool class to implement the Foldseek tool for protein structure comparison.
+This class extends the StructSimTool class to implement the Foldseek tool for protein structure comparison.
 """
 
 
-class TMalign(StructSimTool):
-    def __init__(self, name, description, command):
-        super().__init__(name, description, command)
+class USalign(StructSimTool):
+    def __init__(self):
+        description = "A tool for protein structure comparison using Foldseek."
+        super().__init__("foldseek", description)
+        
