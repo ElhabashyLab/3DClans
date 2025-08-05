@@ -3,6 +3,7 @@ import os
 from fasta2PDB import extract_uids_from_fasta, fetch_pdbs_from_uids
 from USalign import USalign
 from TMalign import TMalign
+from Foldseek import Foldseek
 """
 In this file/directory the performance of different alignment tools of protein structures is benchmarked:
     - US-align
@@ -55,7 +56,7 @@ class Benchmark:
             print(f"Running benchmark for {tool.name}...")
             profiler = cProfile.Profile()
             profiler.enable()
-            scores = tool.run(self.data)
+            scores = tool.start_run(self.data)
             profiler.disable()
             total_time = sum(stat.totaltime for stat in profiler.getstats())
             self.results[tool.name] = {
@@ -70,7 +71,7 @@ class Benchmark:
         """
         Sets up the tools required for benchmarking.
         """
-        tools = [usalign := USalign(), tmalign := TMalign()]
+        tools = [foldseek := Foldseek(), usalign := USalign(), tmalign := TMalign()]
         return tools
 
 

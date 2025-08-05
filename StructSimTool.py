@@ -7,16 +7,17 @@ This module defines a base class for tools that can be used in a benchmarking co
 """
 
 class StructSimTool():
-    def __init__(self, name: str, description: str):
+    def __init__(self, name: str, description: str, working_dir: str):
         self.name = name
         self.description = description
+        self.working_dir = working_dir
         self.command = []
         self.output = None
         
         
     def start_run(self, pdb_dir):
         """
-        RuInitializes the tool to run on the specified PDB directory.
+        Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run.
         This method should be overridden by subclasses to implement specific tool logic.
         """
         raise NotImplementedError("Subclasses should implement this method to run the tool.")
@@ -41,7 +42,7 @@ class StructSimTool():
     
     def _parse_output(self):
         """
-        Parses the output of the command to extract the similarity score.
+        Parses the output of the tool to extract the similarity scores.
         This method should be overridden by subclasses to implement specific parsing logic.
         """
         raise NotImplementedError("Subclasses should implement this method to parse output.")
