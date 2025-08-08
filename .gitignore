@@ -2,3 +2,6 @@
 /venv/
 .venv
 __pycache__/
+Foldseek_working_dir/
+TMalign_working_dir/
+USalign_working_dir/
