@@ -71,7 +71,10 @@ class Benchmark:
         """
         Sets up the tools required for benchmarking.
         """
-        tools = [foldseek := Foldseek(), usalign := USalign(), tmalign := TMalign()]
+        tools = [foldseek := Foldseek(),
+                 #usalign := USalign(),
+                 #tmalign := TMalign()
+                 ]
         return tools
 
 
@@ -95,5 +98,5 @@ class Benchmark:
 
 # test
 fasta_file = "./example_files/small_fasta_files/small_dataset.a2m"
-benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=False)
+benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=True)
 results = benchmark.run_benchmark()

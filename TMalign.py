@@ -42,9 +42,10 @@ class TMalign(StructSimTool):
             df = pd.read_csv(StringIO(self.output), sep='\t')
             if not df.empty:
                 df.columns = [col.lstrip('#') for col in df.columns]
-                scores = df[['PDBchain1', 'PDBchain2', 'TM1', 'TM2']]
-                print(scores)
-                return scores
+                df1 = df[['PDBchain1', 'PDBchain2', 'TM1', 'TM2']]
+                df1['TM'] = df1[['TM1', 'TM2']].max(axis=1)
+                print(df1)
+                return df1
             else:
                 print("Failed to parse output: DataFrame is empty.")
                 return False

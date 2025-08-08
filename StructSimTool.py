@@ -47,27 +47,3 @@ class StructSimTool():
         """
         raise NotImplementedError("Subclasses should implement this method to parse output.")
         
-"""
-    def run_all_against_all(self, pdb_dir):
-        
-        Runs the Tool on all PDB files in the specified directory to compute pairwise similarity scores.
-        Returns a data frame with similarity scores for each pair of PDB files.
-        
-        scores = []
-        filenames = os.listdir(pdb_dir)
-        for i in range(len(filenames)):
-            for j in range(i + 1, len(filenames)):
-                if i != j:
-                    pdb_file1_path = os.path.join(pdb_dir, filenames[i])
-                    pdb_file2_path = os.path.join(pdb_dir, filenames[j])
-                    pair_score = self.run(pdb_file1_path, pdb_file2_path)
-                    scores.append({
-                        'file1': filenames[i],
-                        'file2': filenames[j],
-                        'score': pair_score
-                    })
-        # Convert scores to a DataFrame
-        scores_df = pd.DataFrame(scores)
-        return scores
-"""
-    
