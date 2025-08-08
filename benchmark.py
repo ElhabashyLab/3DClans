@@ -98,5 +98,5 @@ class Benchmark:
 
 # test
 fasta_file = "./example_files/small_fasta_files/small_dataset.a2m"
-benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=True)
+benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=False)
 results = benchmark.run_benchmark()
