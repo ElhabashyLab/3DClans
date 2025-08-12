@@ -1,6 +1,8 @@
 import cProfile
 import os
 from fasta2PDB import extract_uids_from_fasta, fetch_pdbs_from_uids
+from StructSimComputer import StructSimComputer
+from ToolType import ToolType
 from USalign import USalign
 from TMalign import TMalign
 from Foldseek import Foldseek
@@ -23,7 +25,7 @@ class Benchmark:
         in the PDBs_for_benchmark directory. If 'run_with_PDBs_for_benchmark' is True, it will run the benchmark with already downloaded PDB files.
         In this case it does not matter if 'fasta_file' is given.
         """
-        self.tools = self._set_up_tools()
+        self.struct_sim_computer = StructSimComputer()
         self.results = {}
         if run_with_PDBs_for_benchmark:
             # run test with already downloaded PDB files
@@ -52,30 +54,19 @@ class Benchmark:
         """
         Runs the benchmark for each tool in self.tools on all PDB files in self.data directory.
         """
-        for tool in self.tools:
-            print(f"Running benchmark for {tool.name}...")
+        for tool in ToolType:
+            print(f"Running benchmark for {tool.value}...")
             profiler = cProfile.Profile()
             profiler.enable()
-            scores = tool.start_run(self.data)
+            scores = self.struct_sim_computer.run(tool_type=tool, pdb_dir=self.data)
             profiler.disable()
             total_time = sum(stat.totaltime for stat in profiler.getstats())
             self.results[tool.name] = {
                 'score': scores,
                 'total_time': total_time
             }
-            print(f"{tool.name} completed in {total_time:.4f} seconds")
+            print(f"{tool.value} completed in {total_time:.4f} seconds")
         return self.results
-
-
-    def _set_up_tools(self):
-        """
-        Sets up the tools required for benchmarking.
-        """
-        tools = [foldseek := Foldseek(),
-                 #usalign := USalign(),
-                 #tmalign := TMalign()
-                 ]
-        return tools
 
 
     def _delete_dir_content(self, dir_path):

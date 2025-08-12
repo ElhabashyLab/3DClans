@@ -5,3 +5,5 @@ __pycache__/
 Foldseek_working_dir/*
 TMalign_working_dir/*
 USalign_working_dir/*
+input_file_storage/*
+.vscode/*

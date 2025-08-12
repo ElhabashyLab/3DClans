@@ -1,5 +1,6 @@
 import sys
 import argparse
+import os
 
 def read_file(file_path, is_clans):
     """
@@ -53,6 +54,9 @@ def main():
     else:
         read_file(args.file, True)
 
-
+    # fasta to pdb conversion
+    # pdb to scores conversion
+    # clans file generation
+    # saving clans file
 if __name__ == "__main__":
     main()
