@@ -79,7 +79,6 @@ class Foldseek(StructSimTool):
             df = pd.read_csv(self.alignmentFile, sep="\t")
             df.columns = ['PDBchain1', 'PDBchain2', 'TM1', 'TM2']
             df = self._clean_scores(df)
-            print(df)
             return df
         except subprocess.CalledProcessError as e:
             print(f"Error running {self.name} with {convertalis_command}: {e}")

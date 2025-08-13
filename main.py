@@ -1,8 +1,12 @@
 import sys
 import argparse
 import os
+from fasta2PDB import *
+from StructSimComputer import StructSimComputer
+from ToolType import ToolType
 
-def read_file(file_path, is_clans):
+
+def save_file(file_path, is_clans):
     """
     Reads and stores a CLANS or FASTA file with a given file-path.
     :param file_path: path to file
@@ -12,6 +16,7 @@ def read_file(file_path, is_clans):
     try:
         with open(file_path, 'r') as file:
             content = file.read()
+        os.makedirs('input_file_storage', exist_ok=True)
         if is_clans:
             with open('input_file_storage/input_file.clans', 'w') as input_file:
                 input_file.write(content)
@@ -24,7 +29,11 @@ def read_file(file_path, is_clans):
         print(f"Error reading file '{file_path}': {e}", file=sys.stderr)
 
 
-def main():
+def _set_up_parser():
+    """
+    Sets up the command line parser.
+    :return: the parser
+    """
     parser = argparse.ArgumentParser(description="command line parser to read fasta or clans file")
     file_type = parser.add_mutually_exclusive_group(required=True)
 
@@ -46,17 +55,27 @@ def main():
         type=str,
         help="represents path to input file"
     )
+    return parser
 
+
+def main():
+    parser = _set_up_parser()
     # reading arguments
     args = parser.parse_args()
     if args.f:
-        read_file(args.file, False)
+        save_file(args.file, False)
+        # fasta to pdb conversion
+        uids = extract_uids_from_fasta("input_file_storage/input_file.fasta")
+        fetch_pdbs_from_uids(uids, "PDBs")
+        # pdb to scores conversion (for now i use as default the FOLDSEEk tool -> this could be another flag)
+        computer = StructSimComputer()
+        scores = computer.run(ToolType.FOLDSEEK, "PDBs")
+        # clans file generation
+        # saving clans file
     else:
-        read_file(args.file, True)
+        save_file(args.file, True)
+        raise NotImplementedError
 
-    # fasta to pdb conversion
-    # pdb to scores conversion
-    # clans file generation
-    # saving clans file
+    
 if __name__ == "__main__":
     main()

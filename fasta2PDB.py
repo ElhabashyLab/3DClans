@@ -1,5 +1,6 @@
 from Bio import SeqIO
 import requests
+import os
 
 
 def download_file(url, output_path):
@@ -7,6 +8,7 @@ def download_file(url, output_path):
     Downloads a file from a given URL and saves it to a specified local path.
     """
     try:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         response = requests.get(url, stream=True, timeout=10)
         # raise exception if request failed
         response.raise_for_status()

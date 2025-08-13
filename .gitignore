@@ -7,3 +7,6 @@ TMalign_working_dir/*
 USalign_working_dir/*
 input_file_storage/*
 .vscode/*
+PDBs/*
+PDBs_for_benchmark/*
+
