@@ -4,9 +4,10 @@ import os
 from fasta2PDB import *
 from StructSimComputer import StructSimComputer
 from ToolType import ToolType
+from ClansFileGenerator import ClansFileGenerator
 
 
-def save_file(file_path, is_clans):
+def _save_file(file_path, is_clans):
     """
     Reads and stores a CLANS or FASTA file with a given file-path.
     :param file_path: path to file
@@ -63,17 +64,19 @@ def main():
     # reading arguments
     args = parser.parse_args()
     if args.f:
-        save_file(args.file, False)
+        _save_file(args.file, False)
         # fasta to pdb conversion
         uids = extract_uids_from_fasta("input_file_storage/input_file.fasta")
-        fetch_pdbs_from_uids(uids, "PDBs")
+        cleaned_fasta = fetch_pdbs_from_uids(uids, "PDBs") # this returns fasta file of downloaded PDBs
         # pdb to scores conversion (for now i use as default the FOLDSEEk tool -> this could be another flag)
         computer = StructSimComputer()
         scores = computer.run(ToolType.FOLDSEEK, "PDBs")
+        print(scores)
         # clans file generation
-        # saving clans file
+        generator = ClansFileGenerator()
+        clans_file_path = generator.generate_clans_file(scores, "input_file_storage/input_file.fasta") # debug line!
     else:
-        save_file(args.file, True)
+        _save_file(args.file, True)
         raise NotImplementedError
 
     

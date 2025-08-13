@@ -9,4 +9,4 @@ input_file_storage/*
 .vscode/*
 PDBs/*
 PDBs_for_benchmark/*
-
+clans_files/*

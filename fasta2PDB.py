@@ -3,7 +3,7 @@ import requests
 import os
 
 
-def download_file(url, output_path):
+def _download_file(url, output_path):
     """
     Downloads a file from a given URL and saves it to a specified local path.
     """
@@ -48,7 +48,7 @@ def fetch_pdbs_from_uids(uniprot_ids, output_dir):
     number_of_failed_downloads = 0
     for uid in uniprot_ids:
         url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v4.pdb"
-        if not download_file(url, output_dir + f"/{uid}.pdb"):
+        if not _download_file(url, output_dir + f"/{uid}.pdb"):
             number_of_failed_downloads += 1
     print(f"Downloaded {number_of_uids - number_of_failed_downloads} from {number_of_uids} PDB files successfully.")
 
