@@ -3,7 +3,7 @@ import requests
 import os
 
 
-def _download_file(url, output_path):
+def download_file(url, output_path):
     """
     Downloads a file from a given URL and saves it to a specified local path.
     """
@@ -31,26 +31,63 @@ def extract_uids_from_fasta(fasta_file):
     uids = []
     for entry in SeqIO.parse(fasta_file, "fasta"):
         header = entry.id
-        if "|" in header:
-            uid = header.split("|")[1]
-        else:
-            # if no '|' is found in header, the header is assumed to be the uid
-            uid = header
+        uid = extract_uid_from_recordID(header)
         uids.append(uid)
     return uids
 
 
-def fetch_pdbs_from_uids(uniprot_ids, output_dir):
+def clean_fasta_file(fasta_file, uids):
+    """
+    Cleans the fasta file by removing entries that do not have a corresponding PDB file.
+    :param fasta_file: path to the input fasta file
+    :param uids: list of UniProt IDs to keep
+    :return: path to the cleaned fasta file
+    """
+    cleaned_fasta_path = "cleaned.fasta"
+    with open(cleaned_fasta_path, 'w') as cleaned_fasta:
+        for record in SeqIO.parse(fasta_file, "fasta"):
+            if record.id in uids:
+                SeqIO.write(record, cleaned_fasta, "fasta")
+    return cleaned_fasta_path
+
+
+def extract_uid_from_recordID(record_id):
+    """
+    Extracts the UniProt ID from a record ID.
+    Assumes the record ID is in the format 'tr|A0A2M8UWB6|A0A2M8UWB6_PSESP/524-595'.
+    :param record_id: the record ID string
+    :return: the extracted UniProt ID
+    """
+    if "|" in record_id:
+            uid = record_id.split("|")[1]
+    else:
+        # if no '|' is found in header, the header is assumed to be the uid
+        uid = record_id
+    return uid
+
+
+def fetch_pdbs_from_uids(fasta_file, output_dir):
     """
     Fetches and stores PDB files in a specified output directory with a given list of uniprot_ids.
+    It returns a cleaned fasta file containing only the sequences that have been successfully downloaded.
     """
-    number_of_uids = len(uniprot_ids)
+    parsed_fasta = SeqIO.parse(fasta_file, "fasta")
+    number_of_uids = 0
     number_of_failed_downloads = 0
-    for uid in uniprot_ids:
-        url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v4.pdb"
-        if not _download_file(url, output_dir + f"/{uid}.pdb"):
-            number_of_failed_downloads += 1
+    # get dir of fasta_file
+    fasta_dir = os.path.dirname(fasta_file)
+    cleaned_fasta_file = os.path.join(fasta_dir, "cleaned.fasta")
+    with open(cleaned_fasta_file, 'w') as file:
+        for record in parsed_fasta:
+            number_of_uids += 1
+            uid = extract_uid_from_recordID(record.id)
+            url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v4.pdb"
+            if download_file(url, output_dir + f"/{uid}.pdb"):
+                file.write(f">{record.id}\n{str(record.seq)}\n")
+            else:
+                number_of_failed_downloads += 1
     print(f"Downloaded {number_of_uids - number_of_failed_downloads} from {number_of_uids} PDB files successfully.")
+    return cleaned_fasta_file
 
 
 """

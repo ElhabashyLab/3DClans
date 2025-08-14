@@ -37,24 +37,24 @@ def _set_up_parser():
     """
     parser = argparse.ArgumentParser(description="command line parser to read fasta or clans file")
     file_type = parser.add_mutually_exclusive_group(required=True)
-
-    # arguments for file_type
+    
     file_type.add_argument(
         "--f", "-fasta",
-        action="store_true",
+        type=str,
         help="specifies the input as fasta file"
     )
+    
     file_type.add_argument(
         "--c", "-clans",
-        action="store_true",
+        type=str,
         help="specifies the input as clans file"
     )
-
-    # arguments for parser
+    
     parser.add_argument(
-        "file",
-        type=str,
-        help="represents path to input file"
+        "--t", "-tool",
+        required=True,
+        choices=[tool.value for tool in ToolType],
+        help="specifies the tool to use for computing similarity scores"
     )
     return parser
 
@@ -63,20 +63,21 @@ def main():
     parser = _set_up_parser()
     # reading arguments
     args = parser.parse_args()
+    selected_tool = ToolType(args.t)
     if args.f:
-        _save_file(args.file, False)
+        _save_file(args.f, False)
         # fasta to pdb conversion
-        uids = extract_uids_from_fasta("input_file_storage/input_file.fasta")
-        cleaned_fasta = fetch_pdbs_from_uids(uids, "PDBs") # this returns fasta file of downloaded PDBs
-        # pdb to scores conversion (for now i use as default the FOLDSEEk tool -> this could be another flag)
+        input_file = "input_file_storage/input_file.fasta"
+        cleaned_input_file = fetch_pdbs_from_uids(input_file, "PDBs")
+        # pdb to scores conversion (for now i use as default the FOLDSEEk tool -> this will be another flag)
         computer = StructSimComputer()
-        scores = computer.run(ToolType.FOLDSEEK, "PDBs")
+        scores = computer.run(selected_tool, "PDBs")
         print(scores)
         # clans file generation
         generator = ClansFileGenerator()
-        clans_file_path = generator.generate_clans_file(scores, "input_file_storage/input_file.fasta") # debug line!
+        clans_file_path = generator.generate_clans_file(scores, cleaned_input_file)
     else:
-        _save_file(args.file, True)
+        _save_file(args.c, True)
         raise NotImplementedError
 
     
