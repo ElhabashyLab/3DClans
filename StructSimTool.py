@@ -1,6 +1,4 @@
 import subprocess
-import os
-import pandas as pd
 
 """
 This module defines a base class for tools that can be used in a benchmarking context.

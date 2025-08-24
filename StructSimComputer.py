@@ -1,4 +1,3 @@
-from fasta2PDB import extract_uids_from_fasta, fetch_pdbs_from_uids
 from USalign import USalign
 from TMalign import TMalign
 from Foldseek import Foldseek

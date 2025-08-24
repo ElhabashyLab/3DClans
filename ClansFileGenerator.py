@@ -1,6 +1,5 @@
 from ClansFile import ClansFile
 import os
-from Bio import SeqIO
 from fasta2PDB import extract_uids_from_fasta
 
 

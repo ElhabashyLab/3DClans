@@ -68,7 +68,7 @@ def main():
         _save_file(args.f, False)
         # fasta to pdb conversion
         input_file = "input_file_storage/input_file.fasta"
-        cleaned_input_file = fetch_pdbs_from_uids(input_file, "PDBs")
+        cleaned_input_file = fetch_pdbs(input_file, "PDBs")
         # pdb to scores conversion
         computer = StructSimComputer()
         scores = computer.run(selected_tool, "PDBs")

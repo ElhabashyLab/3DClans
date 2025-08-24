@@ -66,10 +66,10 @@ def extract_uid_from_recordID(record_id):
     return uid
 
 
-def fetch_pdbs_from_uids(fasta_file, output_dir):
+def fetch_pdbs(fasta_file, output_dir):
     """
-    Fetches and stores PDB files in a specified output directory with a given list of uniprot_ids.
-    It returns a cleaned fasta file containing only the sequences that have been successfully downloaded.
+    Fetches and stores PDB files in a specified output directory with a given fasta file.
+    It also returns a cleaned fasta file containing only the sequences that have been successfully downloaded.
     """
     parsed_fasta = SeqIO.parse(fasta_file, "fasta")
     number_of_uids = 0

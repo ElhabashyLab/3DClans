@@ -1,11 +1,9 @@
 import cProfile
 import os
-from fasta2PDB import extract_uids_from_fasta, fetch_pdbs_from_uids
+from fasta2PDB import extract_uids_from_fasta, fetch_pdbs
 from StructSimComputer import StructSimComputer
 from ToolType import ToolType
-from USalign import USalign
-from TMalign import TMalign
-from Foldseek import Foldseek
+
 """
 In this file/directory the performance of different alignment tools of protein structures is benchmarked:
     - US-align
@@ -44,8 +42,7 @@ class Benchmark:
                     self._delete_dir_content("PDBs_for_benchmark")
                 else:
                     os.makedirs("PDBs_for_benchmark")
-                UIDS = extract_uids_from_fasta(fasta_file)
-                fetch_pdbs_from_uids(UIDS, "PDBs_for_benchmark")
+                fetch_pdbs(fasta_file, "PDBs_for_benchmark")
                 self.data = "PDBs_for_benchmark"
                 print("Benchmark environment setup complete. PDB files downloaded to './PDBs_for_benchmark'.")
     
@@ -90,6 +87,6 @@ class Benchmark:
 
 
 # test
-fasta_file = "./example_files/small_fasta_files/small_dataset.fasta"
-benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=False)
-results = benchmark.run_benchmark()
+# fasta_file = "./example_files/small_fasta_files/small_dataset.fasta"
+# benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=False)
+# results = benchmark.run_benchmark()
