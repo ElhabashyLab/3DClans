@@ -1,7 +1,13 @@
 import sys
 import argparse
+import os
+from fasta2PDB import *
+from StructSimComputer import StructSimComputer
+from ToolType import ToolType
+from ClansFileGenerator import ClansFileGenerator
 
-def read_file(file_path, is_clans):
+
+def _save_file(file_path, is_clans):
     """
     Reads and stores a CLANS or FASTA file with a given file-path.
     :param file_path: path to file
@@ -11,6 +17,7 @@ def read_file(file_path, is_clans):
     try:
         with open(file_path, 'r') as file:
             content = file.read()
+        os.makedirs('input_file_storage', exist_ok=True)
         if is_clans:
             with open('input_file_storage/input_file.clans', 'w') as input_file:
                 input_file.write(content)
@@ -23,36 +30,55 @@ def read_file(file_path, is_clans):
         print(f"Error reading file '{file_path}': {e}", file=sys.stderr)
 
 
-def main():
+def _set_up_parser():
+    """
+    Sets up the command line parser.
+    :return: the parser
+    """
     parser = argparse.ArgumentParser(description="command line parser to read fasta or clans file")
     file_type = parser.add_mutually_exclusive_group(required=True)
-
-    # arguments for file_type
+    
     file_type.add_argument(
         "--f", "-fasta",
-        action="store_true",
+        type=str,
         help="specifies the input as fasta file"
     )
+    
     file_type.add_argument(
         "--c", "-clans",
-        action="store_true",
+        type=str,
         help="specifies the input as clans file"
     )
-
-    # arguments for parser
+    
     parser.add_argument(
-        "file",
-        type=str,
-        help="represents path to input file"
+        "--t", "-tool",
+        required=True,
+        choices=[tool.value for tool in ToolType],
+        help="specifies the tool to use for computing similarity scores"
     )
+    return parser
 
+
+def main():
+    parser = _set_up_parser()
     # reading arguments
     args = parser.parse_args()
+    selected_tool = ToolType(args.t)
     if args.f:
-        read_file(args.file, False)
+        _save_file(args.f, False)
+        # fasta to pdb conversion
+        input_file = "input_file_storage/input_file.fasta"
+        cleaned_input_file = fetch_pdbs(input_file, "PDBs")
+        # pdb to scores conversion
+        computer = StructSimComputer()
+        scores = computer.run(selected_tool, "PDBs")
+        # clans file generation
+        generator = ClansFileGenerator()
+        clans_file_path = generator.generate_clans_file(scores, cleaned_input_file)
     else:
-        read_file(args.file, True)
+        _save_file(args.c, True)
+        raise NotImplementedError
 
-
+    
 if __name__ == "__main__":
     main()

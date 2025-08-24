@@ -1,2 +1,12 @@
 /.idea/
 /venv/
+.venv
+__pycache__/
+Foldseek_working_dir/*
+TMalign_working_dir/*
+USalign_working_dir/*
+input_file_storage/*
+.vscode/*
+PDBs/*
+PDBs_for_benchmark/*
+clans_files/*
