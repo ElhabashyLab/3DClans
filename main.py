@@ -69,10 +69,9 @@ def main():
         # fasta to pdb conversion
         input_file = "input_file_storage/input_file.fasta"
         cleaned_input_file = fetch_pdbs_from_uids(input_file, "PDBs")
-        # pdb to scores conversion (for now i use as default the FOLDSEEk tool -> this will be another flag)
+        # pdb to scores conversion
         computer = StructSimComputer()
         scores = computer.run(selected_tool, "PDBs")
-        print(scores)
         # clans file generation
         generator = ClansFileGenerator()
         clans_file_path = generator.generate_clans_file(scores, cleaned_input_file)

@@ -25,6 +25,7 @@ class StructSimComputer:
             if tool.name == tool_type.value:
                 print(f"Computing structural similarity with {tool.name}...")
                 scores = tool.start_run(pdb_dir)
+                print(f"Structural similarity computation with {tool.name} completed.")
                 return scores
             else:
                 continue

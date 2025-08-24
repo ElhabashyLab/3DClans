@@ -1,6 +1,5 @@
 from StructSimTool import StructSimTool
 import os
-import subprocess
 import pandas as pd
 from io import StringIO
 """
@@ -42,10 +41,14 @@ class USalign(StructSimTool):
             df = pd.read_csv(StringIO(self.output), sep='\t')
             if not df.empty:
                 df.columns = [col.lstrip('#') for col in df.columns]
-                df1 = df[['PDBchain1', 'PDBchain2', 'TM1', 'TM2']]
+                df1 = df[['PDBchain1', 'PDBchain2', 'TM1', 'TM2']].copy()
                 # take the maximum of TM1 and TM2
                 df1['TM'] = df1[['TM1', 'TM2']].max(axis=1)
-                return df1
+                df2 = df1.drop(columns=['TM1', 'TM2'])
+                # clean PDBchain names
+                df2['PDBchain1'] = df2['PDBchain1'].str.split(".").str[0]
+                df2['PDBchain2'] = df2['PDBchain2'].str.split(".").str[0]
+                return df2
             else:
                 print("Failed to parse output: DataFrame is empty.")
                 return False

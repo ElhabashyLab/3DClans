@@ -1,6 +1,5 @@
 from StructSimTool import StructSimTool
 import os
-import subprocess
 import pandas as pd
 from io import StringIO
 """
@@ -43,8 +42,14 @@ class TMalign(StructSimTool):
             if not df.empty:
                 df.columns = [col.lstrip('#') for col in df.columns]
                 df1 = df[['PDBchain1', 'PDBchain2', 'TM1', 'TM2']]
-                df1['TM'] = df1[['TM1', 'TM2']].max(axis=1)
-                return df1
+                # drop last row (contains CPU time)
+                df2 = df1[:-1].copy()
+                df2['TM'] = df2[['TM1', 'TM2']].max(axis=1)
+                df3 = df2.drop(columns=['TM1', 'TM2'])
+                # clean PDBchain names
+                df3['PDBchain1'] = df3['PDBchain1'].str.split(".").str[0]
+                df3['PDBchain2'] = df3['PDBchain2'].str.split(".").str[0]
+                return df3
             else:
                 print("Failed to parse output: DataFrame is empty.")
                 return False

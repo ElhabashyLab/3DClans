@@ -78,8 +78,8 @@ class Foldseek(StructSimTool):
                                     check=True)
             df = pd.read_csv(self.alignmentFile, sep="\t")
             df.columns = ['PDBchain1', 'PDBchain2', 'TM1', 'TM2']
-            df = self._clean_scores(df)
-            return df
+            df1 = self._clean_scores(df)
+            return df1
         except subprocess.CalledProcessError as e:
             print(f"Error running {self.name} with {convertalis_command}: {e}")
             print(f"stdout: {e.stdout}")
@@ -93,11 +93,12 @@ class Foldseek(StructSimTool):
         """
         # remove duplicates like PDBchain1:PDBchain2 and PDBchain2:PDBchain1
         df["pairs"] = df.apply(lambda row: tuple(sorted([row['PDBchain1'], row['PDBchain2']])), axis=1)
-        df = df.drop_duplicates(subset="pairs")
-        df = df.drop(columns=["pairs"])
+        df1 = df.drop_duplicates(subset="pairs")
+        df2 = df1.drop(columns=["pairs"])
         # remove rows where PDBchain1 is the same as PDBchain2
-        df = df[df['PDBchain1'] != df['PDBchain2']]
-        df['TM'] = df[['TM1', 'TM2']].max(axis=1)
+        df3 = df2[df2['PDBchain1'] != df2['PDBchain2']].copy()
+        df3['TM'] = df3[['TM1', 'TM2']].max(axis=1)
+        df4 = df3.drop(columns=['TM1', 'TM2'])
         # reset index
-        df = df.reset_index(drop=True)
-        return df
+        df4 = df4.reset_index(drop=True)
+        return df4
