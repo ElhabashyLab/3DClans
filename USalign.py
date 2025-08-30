@@ -2,6 +2,7 @@ from StructSimTool import StructSimTool
 import os
 import pandas as pd
 from io import StringIO
+from fasta2PDB import delete_dir_content
 """
 This class extends the StructSimTool class to implement the USalign tool for protein structure comparison.
 """
@@ -10,7 +11,10 @@ This class extends the StructSimTool class to implement the USalign tool for pro
 class USalign(StructSimTool):
     def __init__(self):
         description = "A tool for protein structure comparison using USalign."
-        os.makedirs("USalign_working_dir", exist_ok=True)
+        if os.path.exists("USalign_working_dir"):
+            delete_dir_content("USalign_working_dir")
+        else:
+            os.makedirs("USalign_working_dir")
         working_dir = "USalign_working_dir/"
         super().__init__("USalign", description, working_dir)
         self.flag_dir = "-dir" # specifies the directory containing PDB files

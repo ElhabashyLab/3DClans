@@ -1,6 +1,7 @@
 from Bio import SeqIO
 import requests
 import os
+import shutil
 
 
 def download_file(url, output_path):
@@ -20,6 +21,14 @@ def download_file(url, output_path):
     except Exception as e:
         print(f"Failed to download {url}: {str(e)}")
         return False
+    
+
+def delete_dir_content(dir_path):
+        """
+        Deletes the content of the specified directory.
+        """
+        shutil.rmtree(dir_path)
+        os.makedirs(dir_path)
 
 
 def extract_uids_from_fasta(fasta_file):
@@ -69,6 +78,7 @@ def extract_uid_from_recordID(record_id):
 def fetch_pdbs(fasta_file, output_dir):
     """
     Fetches and stores PDB files in a specified output directory with a given fasta file.
+    The contents of the output dir will be overwritten.
     It also returns a cleaned fasta file containing only the sequences that have been successfully downloaded.
     """
     parsed_fasta = SeqIO.parse(fasta_file, "fasta")
@@ -77,6 +87,11 @@ def fetch_pdbs(fasta_file, output_dir):
     # get dir of fasta_file
     fasta_dir = os.path.dirname(fasta_file)
     cleaned_fasta_file = os.path.join(fasta_dir, "cleaned.fasta")
+    # delete old PDB files if they exist
+    if os.path.exists(output_dir):
+        delete_dir_content(output_dir)
+    else:
+        os.makedirs(output_dir)
     with open(cleaned_fasta_file, 'w') as file:
         for record in parsed_fasta:
             number_of_uids += 1

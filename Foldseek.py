@@ -1,4 +1,5 @@
 from StructSimTool import StructSimTool
+from fasta2PDB import delete_dir_content
 import subprocess
 import os
 import pandas as pd
@@ -10,7 +11,10 @@ This class extends the StructSimTool class to implement the Foldseek tool for pr
 class Foldseek(StructSimTool):
     def __init__(self):
         description = "A tool for protein structure comparison using Foldseek."
-        os.makedirs("Foldseek_working_dir", exist_ok=True)
+        if os.path.exists("Foldseek_working_dir"):
+            delete_dir_content("Foldseek_working_dir")
+        else:
+            os.makedirs("Foldseek_working_dir")
         working_dir = "Foldseek_working_dir/"
         super().__init__("foldseek", description, working_dir)
         self.createdb = "createdb"  # command to create a database
@@ -102,3 +106,4 @@ class Foldseek(StructSimTool):
         # reset index
         df4 = df4.reset_index(drop=True)
         return df4
+    

@@ -1,6 +1,6 @@
 from ClansFile import ClansFile
 import os
-from fasta2PDB import extract_uids_from_fasta
+from fasta2PDB import extract_uids_from_fasta, delete_dir_content
 
 
 class ClansFileGenerator:
@@ -9,7 +9,10 @@ class ClansFileGenerator:
     """
     def __init__(self):
         self.output_dir = "clans_files"
-        os.makedirs(self.output_dir, exist_ok=True)
+        if os.path.exists(self.output_dir):
+            delete_dir_content(self.output_dir)
+        else:
+            os.makedirs(self.output_dir)
 
 
     def generate_clans_file(self, scores, fasta):
@@ -38,8 +41,9 @@ class ClansFileGenerator:
     def _transform_scores_to_clans_format(self, scores, uids):
         """
         Transform the pairwise similarity scores into the format required by CLANS.
-        Changes the names of the PDBs to their corresponding indices of the input fasta.
-        The order of the rows in the df should be (with f.e. 3 fasta entries):
+        1. Changes the names of the PDBs to their corresponding indices of the input fasta.
+        2. Transforms the TM-score to a distance metric (1 - TM-score)
+        3. Changes the order of the rows to this format (with f.e. 3 fasta entries):
          PDBchain1  PDBchain2   TM
             0     1      0.8
             0     2      0.7
@@ -68,6 +72,8 @@ class ClansFileGenerator:
         scores1 = scores.copy()
         scores1["PDBchain1"] = scores1["PDBchain1"].map(lambda x: uid_to_index[x])
         scores1["PDBchain2"] = scores1["PDBchain2"].map(lambda x: uid_to_index[x])
+        # transform TM-score to distance metric
+        scores1["TM"] = 1 - scores1["TM"]
         # order the pairs
         scores1 = scores1.sort_values(by=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
         return scores1

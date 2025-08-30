@@ -1,6 +1,6 @@
 import cProfile
 import os
-from fasta2PDB import extract_uids_from_fasta, fetch_pdbs
+from fasta2PDB import delete_dir_content, fetch_pdbs
 from StructSimComputer import StructSimComputer
 from ToolType import ToolType
 
@@ -38,10 +38,6 @@ class Benchmark:
                 print("Please provide a fasta file for initial test.")
             else:
                 print(f"Setting up benchmark environment with {fasta_file}...")
-                if os.path.exists("PDBs_for_benchmark"):
-                    self._delete_dir_content("PDBs_for_benchmark")
-                else:
-                    os.makedirs("PDBs_for_benchmark")
                 fetch_pdbs(fasta_file, "PDBs_for_benchmark")
                 self.data = "PDBs_for_benchmark"
                 print("Benchmark environment setup complete. PDB files downloaded to './PDBs_for_benchmark'.")
@@ -68,25 +64,7 @@ class Benchmark:
         return self.results
 
 
-    def _delete_dir_content(self, dir_path):
-        """
-        Deletes the content of the specified directory.
-        """
-        if os.path.exists(dir_path):
-            for file in os.listdir(dir_path):
-                file_path = os.path.join(dir_path, file)
-                try:
-                    if os.path.isfile(file_path) or os.path.islink(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        os.rmdir(file_path)
-                except Exception as e:
-                    print(f"Failed to delete {file_path}. Reason: {e}")
-        else:
-            print(f"Directory {dir_path} does not exist.")
-
-
 # test
-# fasta_file = "./example_files/small_fasta_files/small_dataset.fasta"
-# benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=False)
-# results = benchmark.run_benchmark()
+fasta_file = "./example_files/small_fasta_files/small_dataset.fasta"
+benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=False)
+results = benchmark.run_benchmark()
