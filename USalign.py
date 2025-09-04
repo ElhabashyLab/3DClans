@@ -48,6 +48,7 @@ class USalign(StructSimTool):
                 df1 = df[['PDBchain1', 'PDBchain2', 'TM1', 'TM2']].copy()
                 # take the maximum of TM1 and TM2
                 df1['TM'] = df1[['TM1', 'TM2']].max(axis=1)
+                df1["score"] = 1 - df1["TM"]  # transform TM-score to distance metric
                 df2 = df1.drop(columns=['TM1', 'TM2'])
                 # clean PDBchain names
                 df2['PDBchain1'] = df2['PDBchain1'].str.split(".").str[0]

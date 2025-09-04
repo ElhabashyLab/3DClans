@@ -36,7 +36,7 @@ class StructSimComputer:
         """
         Sets up the StructSimTools.
         """
-        tools = [foldseek := Foldseek(),
+        tools = [foldseek := Foldseek("TM"), #choose "TM" or "evalue" for Foldseek
                  usalign := USalign(),
                  tmalign := TMalign()
                  ]

@@ -54,12 +54,10 @@ class ClansFile:
         for coord in self.coordinates:
             output.append(f"{coord[0]} {coord[1]} {coord[2]} {coord[3]}")
         output.append("</pos>")
-        # add pairwise similarity scores (scores is a df with columns = ['PDBchain1', 'PDBchain2', 'TM'])
+        # add pairwise similarity scores (scores is a df with columns = ['PDBchain1', 'PDBchain2', 'score'])
         output.append("<hsp>")
         for index, row in self.scores.iterrows():
-            min_index = min(row['PDBchain1'], row['PDBchain2'])
-            max_index = max(row['PDBchain1'], row['PDBchain2'])
-            output.append(f"{int(min_index)} {int(max_index)}:{row['TM']}")     
+            output.append(f"{int(row['PDBchain1'])} {int(row['PDBchain2'])}:{row['score']}")
         output.append("</hsp>")
         return "\n".join(output)
         

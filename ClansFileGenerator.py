@@ -1,6 +1,7 @@
 from ClansFile import ClansFile
 import os
 from fasta2PDB import extract_uids_from_fasta, delete_dir_content
+import numpy as np
 
 
 class ClansFileGenerator:
@@ -42,9 +43,8 @@ class ClansFileGenerator:
         """
         Transform the pairwise similarity scores into the format required by CLANS.
         1. Changes the names of the PDBs to their corresponding indices of the input fasta.
-        2. Transforms the TM-score to a distance metric (1 - TM-score)
-        3. Changes the order of the rows to this format (with f.e. 3 fasta entries):
-         PDBchain1  PDBchain2   TM
+        2. Changes the order of the rows to this format (with f.e. 3 fasta entries):
+         PDBchain1  PDBchain2   score
             0     1      0.8
             0     2      0.7
             1     2      0.6
@@ -56,12 +56,12 @@ class ClansFileGenerator:
             1: A0A836ZK00
             2: A0A2W5V1G2
         scores:
-            PDBchain1  PDBchain2   TM
+            PDBchain1  PDBchain2   score
             A0A836ZK00 A0A2W5V1G2 0.4469
             A0A836ZK00 A0A2M8UWB6 0.4481
             A0A2M8UWB6 A0A2W5V1G2 0.8499
         transformed scores:
-            PDBchain1  PDBchain2   TM
+            PDBchain1  PDBchain2   score
             0   1   0.4469
             0   2   0.4481
             1   2   0.8499
@@ -72,8 +72,11 @@ class ClansFileGenerator:
         scores1 = scores.copy()
         scores1["PDBchain1"] = scores1["PDBchain1"].map(lambda x: uid_to_index[x])
         scores1["PDBchain2"] = scores1["PDBchain2"].map(lambda x: uid_to_index[x])
-        # transform TM-score to distance metric
-        scores1["TM"] = 1 - scores1["TM"]
+        # make sure PDBchain1 < PDBchain2
+        scores1["PDBchain1_new"] = np.minimum(scores1["PDBchain1"], scores1["PDBchain2"])
+        scores1["PDBchain2_new"] = np.maximum(scores1["PDBchain1"], scores1["PDBchain2"])
+        scores1[["PDBchain1", "PDBchain2"]] = scores1[["PDBchain1_new", "PDBchain2_new"]]
+        scores1 = scores1.drop(columns=["PDBchain1_new", "PDBchain2_new"])
         # order the pairs
         scores1 = scores1.sort_values(by=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
         return scores1

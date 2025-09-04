@@ -9,8 +9,9 @@ This class extends the StructSimTool class to implement the Foldseek tool for pr
 
 
 class Foldseek(StructSimTool):
-    def __init__(self):
+    def __init__(self, score):
         description = "A tool for protein structure comparison using Foldseek."
+        self.score = score
         if os.path.exists("Foldseek_working_dir"):
             delete_dir_content("Foldseek_working_dir")
         else:
@@ -21,8 +22,21 @@ class Foldseek(StructSimTool):
         self.search = "search"  # command to search in the database
         self.convertalis = "convertalis"  # command to convert alignment results
         self.flag_format_output = "--format-output" # flag to specify output format
-        self.output_columns = "query,target,qtmscore,ttmscore"  # columns to output
+        self.output_columns = self._get_output_columns_from_self_score()  # specifies the columns foldseek returns based on the needed metric (important metrics: qtmscore, ttmscore, evalue)
         self.flag_a = "-a" # enables foldseek to store alignment backtrace information (needed for TM scores)
+
+
+    def _get_output_columns_from_self_score(self):
+        """
+        Generates the ouptut columns of foldseek based on self.score.
+        """
+        if self.score == "TM":
+            output_columns = "query,target,qtmscore,ttmscore"
+        elif self.score == "evalue":
+            output_columns = "query,target,evalue"
+        else:
+            raise ValueError(f"Invalid score type: {self.score}. Supported types are 'TM' and 'evalue'.")
+        return output_columns
 
 
     def start_run(self, pdb_dir):
@@ -71,7 +85,7 @@ class Foldseek(StructSimTool):
 
     def _parse_output(self):
         """
-        Parses the output of the tool to extract the similarity scores.
+        Parses the output of the tool to extract self.score.
         """
         self.alignmentFile = self.working_dir + "alignmentFile"
         convertalis_command = [self.name, self.convertalis, self.db, self.db, self.alignmentDb, self.alignmentFile, self.flag_format_output, self.output_columns]
@@ -81,7 +95,8 @@ class Foldseek(StructSimTool):
                                     text=True,
                                     check=True)
             df = pd.read_csv(self.alignmentFile, sep="\t")
-            df.columns = ['PDBchain1', 'PDBchain2', 'TM1', 'TM2']
+            # name the columns of the df
+            df.columns = ["PDBchain1", "PDBchain2", "TM1", "TM2"] if self.score == "TM" else ["PDBchain1", "PDBchain2", "evalue"]
             df1 = self._clean_scores(df)
             return df1
         except subprocess.CalledProcessError as e:
@@ -90,9 +105,10 @@ class Foldseek(StructSimTool):
             print(f"stderr: {e.stderr}")
             return False
 
+
     def _clean_scores(self, df):
         """
-        recieves a DataFrame containing PDBchain1, PDBchain2, TM1, TM2 columns
+        Receives a DataFrame containing the columns 'PDBchain1, PDBchain2, score'
         and returns a cleaned DataFrame with no duplicate rows like PDBchain1:PDBchain2 and PDBchain2:PDBchain1
         """
         # remove duplicates like PDBchain1:PDBchain2 and PDBchain2:PDBchain1
@@ -101,8 +117,13 @@ class Foldseek(StructSimTool):
         df2 = df1.drop(columns=["pairs"])
         # remove rows where PDBchain1 is the same as PDBchain2
         df3 = df2[df2['PDBchain1'] != df2['PDBchain2']].copy()
-        df3['TM'] = df3[['TM1', 'TM2']].max(axis=1)
-        df4 = df3.drop(columns=['TM1', 'TM2'])
+        # clean scores based on self.score
+        if self.score == "TM":
+            df3['score'] = df3[['TM1', 'TM2']].max(axis=1)
+            df4 = df3.drop(columns=['TM1', 'TM2'])
+        else:
+            df3['score'] = df3['evalue']
+            df4 = df3.drop(columns=['evalue'])
         # reset index
         df4 = df4.reset_index(drop=True)
         return df4

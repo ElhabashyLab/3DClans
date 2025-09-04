@@ -49,6 +49,7 @@ class TMalign(StructSimTool):
                 # drop last row (contains CPU time)
                 df2 = df1[:-1].copy()
                 df2['TM'] = df2[['TM1', 'TM2']].max(axis=1)
+                df2["score"] = 1 - df2["TM"]  # transform TM-score to distance metric
                 df3 = df2.drop(columns=['TM1', 'TM2'])
                 # clean PDBchain names
                 df3['PDBchain1'] = df3['PDBchain1'].str.split(".").str[0]
