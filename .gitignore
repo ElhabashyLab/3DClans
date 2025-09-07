@@ -10,3 +10,4 @@ input_file_storage/*
 PDBs/*
 PDBs_for_benchmark/*
 clans_files/*
+Dataset_Generator/psiblast_results.xml
