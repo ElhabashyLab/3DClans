@@ -10,9 +10,9 @@ class DatasetGenerator:
     def __init__(self):
         self.Entrez_email = "aron.wichtner@tuebingen.mpg.de"
         self.psiblast_results_path = "Dataset_Generator/psiblast_results.xml"
-    
-    
-    def generate(self, n, n_cl, seeds):
+
+
+    def generate(self, n: int, n_cl: int, seeds: list[str]) -> str:
         """
         Generates a fasta file with n sequences grouped into n_cl clusters.
         :param n: number of sequences
@@ -80,7 +80,7 @@ class DatasetGenerator:
         return records
     
     
-    def _blast_sequence(self, record, size_of_hitlist):
+    def _blast_sequence(self, record):
         """
         PSI-Blasts a protein record.
         :param record: the protein record to blast
@@ -92,7 +92,6 @@ class DatasetGenerator:
             database="nr",
             sequence=str(record.seq),
             service="psi",
-            hitlist_size=size_of_hitlist,
             word_size=3
         )
         return result_handle
@@ -106,29 +105,34 @@ class DatasetGenerator:
         :param i: index of the cluster
         :return: list of SeqRecord objects
         """
-        results_handle = self._blast_sequence(record, num_sequences)
+        results_handle = self._blast_sequence(record)
         self._save_to_file(self.psiblast_results_path, results_handle.read())
         results_handle.close()
-        similar_records = self._parse_hits()
+        similar_records = self._parse_hits(num_sequences)
         for record in similar_records:
             record.description = f"Cluster_{i+1}_Similar"
+        print(f"Downloaded {len(similar_records)} of {num_sequences} similar sequences for cluster {i + 1}.")
         return similar_records
-        
-        
-    def _parse_hits(self):
+
+
+    def _parse_hits(self, max_hits):
         """
         Parses the BLAST hits from the XML result file.
-        :return: list of SeqRecord objects
+        :param max_hits: maximum number of similar records to retrieve
+        :return: list of SeqRecord objects not longer than max_hits
         """
         fasta_records = []
         hit_ids = []
         with open(self.psiblast_results_path) as f:
-            blast_records = NCBIXML.parse(f)
-            for blast_record in blast_records:
-                # Collect hit IDs
-                for alignment in blast_record.alignments:
-                    hit_ids.append(alignment.hit_id)
-            fasta_records = self._download_sequences(hit_ids)
+            blast_records = list(NCBIXML.parse(f))
+        # get results of the last PSI iteration
+        final_blast_record = blast_records[-1]
+        for alignment in final_blast_record.alignments:
+            if alignment.accession not in hit_ids and len(hit_ids) < max_hits:
+                hit_ids.append(alignment.accession)
+            else:
+                break
+        fasta_records = self._download_sequences(hit_ids)
         return fasta_records
 
 
@@ -143,10 +147,6 @@ class DatasetGenerator:
             
             
 # test
-#"Q99895", "P42212"
-seeds = ["P68871"]
+seeds = ["P68871", "Q99895", "P42212"]
 generator = DatasetGenerator()
-generator.generate(9, 1, seeds)
-# something is wrong with the seq.headers
-# something is off with the number of sequences returned by blast...
-# check overwritting of xml file
+generator.generate(30, 3, seeds)
