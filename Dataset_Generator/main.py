@@ -25,6 +25,7 @@ class DatasetGenerator:
         for i in range(n_cl):
             seed_uid = seeds[i]
             seed_record = self._download_seed_records(seed_uid, i)
+            seed_record = self._clean_fasta_header(seed_record)
             fasta_records.append(seed_record)
             # blast for n/n_cl - 1 similar sequences
             print(f"Finding similar sequences for cluster {i + 1}...")
@@ -89,9 +90,9 @@ class DatasetGenerator:
         # Run PSI-BLAST with the fetched sequence
         result_handle = NCBIWWW.qblast(
             program="blastp",
-            database="nr",
+            database="swissprot", # makes sure sequences have structures in alphafold DB
             sequence=str(record.seq),
-            service="psi",
+            service="plain",
             word_size=3
         )
         return result_handle
@@ -128,12 +129,14 @@ class DatasetGenerator:
         # get results of the last PSI iteration
         final_blast_record = blast_records[-1]
         for alignment in final_blast_record.alignments:
-            if alignment.accession not in hit_ids and len(hit_ids) < max_hits:
-                hit_ids.append(alignment.accession)
+            accession = alignment.accession
+            if accession not in hit_ids and len(hit_ids) < max_hits:
+                hit_ids.append(accession)
             else:
                 break
         fasta_records = self._download_sequences(hit_ids)
-        return fasta_records
+        fasta_records_cleaned = [self._clean_fasta_header(record) for record in fasta_records]
+        return fasta_records_cleaned
 
 
     def _save_to_file(self, filename, content):
@@ -145,8 +148,19 @@ class DatasetGenerator:
         with open(filename, "w") as f:
             f.write(content)
             
+    
+    def _clean_fasta_header(self, record):
+        """
+        Cleans the fasta header of a SeqRecord object so it only contains the UniProt ID.
+        :param record: the SeqRecord object
+        :return: the cleaned SeqRecord object
+        """
+        record.id = record.id.split("|")[1].split(".")[0]
+        return record
+
             
 # test
-seeds = ["P68871", "Q99895", "P42212"]
+#, "Q99895", "P42212"
+seeds = ["P68871"]
 generator = DatasetGenerator()
-generator.generate(30, 3, seeds)
+generator.generate(30, 1, seeds)

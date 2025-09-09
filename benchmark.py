@@ -1,4 +1,5 @@
 import cProfile
+import time
 import os
 from fasta2PDB import delete_dir_content, fetch_pdbs
 from StructSimComputer import StructSimComputer
@@ -49,11 +50,10 @@ class Benchmark:
         """
         for tool in ToolType:
             print(f"Running benchmark for {tool.value}...")
-            profiler = cProfile.Profile()
-            profiler.enable()
+            start = time.time()
             scores = self.struct_sim_computer.run(tool_type=tool, pdb_dir=self.data)
-            profiler.disable()
-            total_time = sum(stat.totaltime for stat in profiler.getstats())
+            end = time.time()
+            total_time = end - start
             self.results[tool.name] = {
                 'score': scores,
                 'total_time': total_time

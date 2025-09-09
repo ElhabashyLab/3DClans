@@ -63,15 +63,16 @@ def clean_fasta_file(fasta_file, uids):
 def extract_uid_from_recordID(record_id):
     """
     Extracts the UniProt ID from a record ID.
-    Assumes the record ID is in the format 'tr|A0A2M8UWB6|A0A2M8UWB6_PSESP/524-595'.
+    It removes any version numbers and prefixes.
+    Assumes the record ID is in the format 'tr|A0A2M8UWB6.1|A0A2M8UWB6_PSESP/524-595'.
     :param record_id: the record ID string
     :return: the extracted UniProt ID
     """
     if "|" in record_id:
-            uid = record_id.split("|")[1]
+            uid = record_id.split("|")[1].split(".")[0]
     else:
         # if no '|' is found in header, the header is assumed to be the uid
-        uid = record_id
+        uid = record_id.split(".")[0]
     return uid
 
 
