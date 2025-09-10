@@ -43,26 +43,26 @@ def _set_up_parser():
     file_type = parser.add_mutually_exclusive_group(required=True)
     
     file_type.add_argument(
-        "--f", "-fasta",
+        "-f", "--fasta",
         type=str,
         help="specifies the input as fasta file"
     )
     
     file_type.add_argument(
-        "--c", "-clans",
+        "-c", "--clans",
         type=str,
         help="specifies the input as clans file"
     )
     
     parser.add_argument(
-        "--t", "-tool",
+        "-t", "--tool",
         required=True,
         choices=[tool.value for tool in ToolType],
         help="specifies the tool to use for computing similarity scores"
     )
     
     parser.add_argument(
-        "--s", "-score",
+        "-s", "--score",
         required=False,
         choices=["evalue", "TM-score"],
         default="evalue",
@@ -77,14 +77,14 @@ def main():
     parser = _set_up_parser()
     args = parser.parse_args()
     # process input as clans file
-    if args.c:
-        input_file = _save_file(args.c, True)
+    if args.clans:
+        input_file = _save_file(args.clans, True)
         raise NotImplementedError
     # process input as fasta file
-    elif args.f:
-        input_file = _save_file(args.f, False)
-        selected_tool = ToolType(args.t)
-        foldseek_score = args.s
+    elif args.fasta:
+        input_file = _save_file(args.fasta, False)
+        selected_tool = ToolType(args.tool)
+        foldseek_score = args.score
         scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
         clans_generator = ClansFileGenerator()
         # fasta to pdb conversion
@@ -103,7 +103,7 @@ def _set_up_scores_computer(selected_tool, foldseek_score):
         else:
             return StructSimComputer("TM")
     elif selected_tool != ToolType.FOLDSEEK and foldseek_score != None:
-        raise ValueError("The foldseek score (--s -score) can only be specified if foldseek is chosen as tool.")
+        raise ValueError("The foldseek score (-s --score) can only be specified if foldseek is chosen as tool.")
     else:
         return StructSimComputer()
 
