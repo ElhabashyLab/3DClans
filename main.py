@@ -12,6 +12,7 @@ def _save_file(file_path, is_clans):
     Reads and stores a CLANS or FASTA file with a given file-path.
     :param file_path: path to file
     :param is_clans: specifies if input is CLANS or FASTA file
+    :return: path to saved file
     """
     print(f"processing of {file_path}:")
     try:
@@ -19,11 +20,14 @@ def _save_file(file_path, is_clans):
             content = file.read()
         os.makedirs('input_file_storage', exist_ok=True)
         if is_clans:
-            with open('input_file_storage/input_file.clans', 'w') as input_file:
+            path_to_stored_file = 'input_file_storage/input_file.clans'
+            with open(path_to_stored_file, 'w') as input_file:
                 input_file.write(content)
         else:
-            with open('input_file_storage/input_file.fasta', 'w') as input_file:
+            path_to_stored_file = 'input_file_storage/input_file.fasta'
+            with open(path_to_stored_file, 'w') as input_file:
                 input_file.write(content)
+        return path_to_stored_file
     except FileNotFoundError:
         print(f"Error: File '{file_path}' not found.", file=sys.stderr)
     except IOError as e:
@@ -56,29 +60,53 @@ def _set_up_parser():
         choices=[tool.value for tool in ToolType],
         help="specifies the tool to use for computing similarity scores"
     )
+    
+    parser.add_argument(
+        "--s", "-score",
+        required=False,
+        choices=["evalue", "TM-score"],
+        default="evalue",
+        help="specifies the scoring method to use for Foldseek (default: evalue)",
+        
+    )
+
     return parser
 
 
 def main():
     parser = _set_up_parser()
-    # reading arguments
     args = parser.parse_args()
-    selected_tool = ToolType(args.t)
-    if args.f:
-        _save_file(args.f, False)
-        # fasta to pdb conversion
-        input_file = "input_file_storage/input_file.fasta"
-        cleaned_input_file = fetch_pdbs(input_file, "PDBs")
-        # pdb to scores conversion
-        computer = StructSimComputer()
-        scores = computer.run(selected_tool, "PDBs")
-        # clans file generation
-        generator = ClansFileGenerator()
-        clans_file_path = generator.generate_clans_file(scores, cleaned_input_file)
-    else:
-        _save_file(args.c, True)
+    # process input as clans file
+    if args.c:
+        input_file = _save_file(args.c, True)
         raise NotImplementedError
+    # process input as fasta file
+    elif args.f:
+        input_file = _save_file(args.f, False)
+        selected_tool = ToolType(args.t)
+        foldseek_score = args.s
+        scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
+        clans_generator = ClansFileGenerator()
+        # fasta to pdb conversion
+        cleaned_input_file = fetch_pdbs(input_file, "PDBs")
+        scores = scores_computer.run(selected_tool, "PDBs")
+        # clans file generation
+        clans_file_path = clans_generator.generate_clans_file(scores, cleaned_input_file)
+    else:
+        raise ValueError("Please specify either a fasta or clans file as input.")
+            
 
-    
+def _set_up_scores_computer(selected_tool, foldseek_score):
+    if selected_tool == ToolType.FOLDSEEK:
+        if foldseek_score == None or foldseek_score == "evalue":
+            return StructSimComputer()
+        else:
+            return StructSimComputer("TM")
+    elif selected_tool != ToolType.FOLDSEEK and foldseek_score != None:
+        raise ValueError("The foldseek score (--s -score) can only be specified if foldseek is chosen as tool.")
+    else:
+        return StructSimComputer()
+
+
 if __name__ == "__main__":
     main()

@@ -8,14 +8,15 @@ class StructSimComputer:
     """
     This class is responsible for computing structural similarities between protein structures using various tools.
     """
-    def __init__(self):
+    def __init__(self, foldseek_score="evalue"):
         """
         Sets up a tool to compute structural similarities between protein structures.
         """
+        self.foldseek_score = foldseek_score
         self.tools = self._set_up_tools()
         self.results = {}    
-    
-    
+
+
     def run(self, tool_type: ToolType, pdb_dir: str):
         """
         Run the specified tool on the PDB directory.
@@ -36,7 +37,7 @@ class StructSimComputer:
         """
         Sets up the StructSimTools.
         """
-        tools = [foldseek := Foldseek("TM"), #choose "TM" or "evalue" for Foldseek
+        tools = [foldseek := Foldseek(self.foldseek_score),
                  usalign := USalign(),
                  tmalign := TMalign()
                  ]

@@ -40,24 +40,35 @@ class ClansFile:
         """
         Returns a string representation of the CLANS file.
         """
-        output = []
-        # add the number of sequences
-        output.append(f"sequences={self.number_of_sequences}")
-        output.append("<seq>")
-        # add the content of the fasta file
+        content = []
+        content.append(f"sequences={self.number_of_sequences}")
+        content = self._add_fasta_to_content(content)
+        content = self._add_coordinates_to_content(content)
+        content = self._add_scores_to_content(content)
+        return "\n".join(content)
+    
+    
+    def _add_fasta_to_content(self, content):
+        content.append("<seq>")
         with open(self.path_to_fasta, 'r') as fasta_file:
-            for line in fasta_file:
-                output.append(line.strip()) 
-        output.append("</seq>")
-        # add coordinates for each sequence
-        output.append("<pos>")
+            fasta_content = fasta_file.read().strip()
+        content.append(fasta_content)
+        content.append("</seq>")
+        return content
+    
+    
+    def _add_coordinates_to_content(self, content):
+        content.append("<pos>")
         for coord in self.coordinates:
-            output.append(f"{coord[0]} {coord[1]} {coord[2]} {coord[3]}")
-        output.append("</pos>")
-        # add pairwise similarity scores (scores is a df with columns = ['PDBchain1', 'PDBchain2', 'score'])
-        output.append("<hsp>")
+            content.append(f"{coord[0]} {coord[1]} {coord[2]} {coord[3]}")
+        content.append("</pos>")
+        return content
+    
+    
+    def _add_scores_to_content(self, content):
+        content.append("<hsp>")
         for index, row in self.scores.iterrows():
-            output.append(f"{int(row['PDBchain1'])} {int(row['PDBchain2'])}:{row['score']}")
-        output.append("</hsp>")
-        return "\n".join(output)
-        
+            content.append(f"{int(row['PDBchain1'])} {int(row['PDBchain2'])}:{row['score']}")
+        content.append("</hsp>")
+        return content
+    

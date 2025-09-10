@@ -92,7 +92,7 @@ class DatasetGenerator:
             program="blastp",
             database="swissprot", # makes sure sequences have structures in alphafold DB
             sequence=str(record.seq),
-            service="plain",
+            service="psi",
             word_size=3
         )
         return result_handle
@@ -155,12 +155,15 @@ class DatasetGenerator:
         :param record: the SeqRecord object
         :return: the cleaned SeqRecord object
         """
-        record.id = record.id.split("|")[1].split(".")[0]
-        return record
+        if "|" in record.id:
+            record.id = record.id.split("|")[1].split(".")[0]
+            return record
+        else:
+            record.id = record.id.split(".")[0]
+            return record
 
             
 # test
-#, "Q99895", "P42212"
-seeds = ["P68871"]
+seeds = ["P68871", "Q99895", "P42212"]
 generator = DatasetGenerator()
-generator.generate(30, 1, seeds)
+generator.generate(30, 3, seeds)
