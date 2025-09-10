@@ -64,7 +64,7 @@ def _set_up_parser():
     parser.add_argument(
         "-s", "--score",
         required=False,
-        choices=["evalue", "TM-score"],
+        choices=["evalue", "TM"],
         default="evalue",
         help="specifies the scoring method to use for Foldseek (default: evalue)",
         
