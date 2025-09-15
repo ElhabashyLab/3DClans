@@ -1,19 +1,16 @@
-import cProfile
 import time
 import os
-from fasta2PDB import delete_dir_content, fetch_pdbs
+from fasta2PDB import fetch_pdbs
 from StructSimComputer import StructSimComputer
 from ToolType import ToolType
 
 """
-In this file/directory the performance of different alignment tools of protein structures is benchmarked:
+In this file the performance of different alignment tools of protein structures is benchmarked:
     - US-align
     - TM-align
     - Foldseek
-    - 3D Blast
-    - Graph Align
 This is done by running the tools on a predefined set of PDB files
-and measuring the time taken for each tool with cProfile.
+and measuring the time taken for each tool with a timer.
 """
 
 class Benchmark:
