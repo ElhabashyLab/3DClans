@@ -8,8 +8,8 @@ class ClansFileGenerator:
     """
     This class is responsible for generating a CLANS input file from a fasta file.
     """
-    def __init__(self):
-        self.output_dir = "clans_files"
+    def __init__(self, output_dir="clans_files"):
+        self.output_dir = output_dir
         if os.path.exists(self.output_dir):
             delete_dir_content(self.output_dir)
         else:
@@ -32,7 +32,8 @@ class ClansFileGenerator:
             scores
         )
         content = clans_file.__str__
-        clans_file_path = os.path.join(self.output_dir, "file.clans")
+        fasta_name = os.path.basename(fasta).split(".")[0]
+        clans_file_path = os.path.join(self.output_dir, f"{fasta_name}.clans")
         with open(clans_file_path, 'w') as file:
             file.write(content())
         print(f"CLANS file generated at {clans_file_path}")

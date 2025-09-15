@@ -3,12 +3,12 @@ from fasta2PDB import delete_dir_content
 import subprocess
 import os
 import pandas as pd
-"""
-This class extends the StructSimTool class to implement the Foldseek tool for protein structure comparison.
-"""
 
 
 class Foldseek(StructSimTool):
+    """
+    This class extends the StructSimTool class to implement the Foldseek tool for protein structure comparison.
+    """
     def __init__(self, score):
         description = "A tool for protein structure comparison using Foldseek."
         self.score = score

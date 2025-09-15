@@ -1,10 +1,10 @@
 import subprocess
 
-"""
-This module defines a base class for tools that can be used in a benchmarking context.
-"""
 
 class StructSimTool():
+    """
+    This module defines a base class for tools that can be used in a benchmarking context.
+    """
     def __init__(self, name: str, description: str, working_dir: str):
         self.name = name
         self.description = description

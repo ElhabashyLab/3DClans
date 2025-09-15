@@ -27,7 +27,8 @@ def delete_dir_content(dir_path):
         """
         Deletes the content of the specified directory.
         """
-        shutil.rmtree(dir_path)
+        if os.path.exists(dir_path):
+            shutil.rmtree(dir_path)
         os.makedirs(dir_path)
 
 
@@ -76,18 +77,19 @@ def extract_uid_from_recordID(record_id):
     return uid
 
 
-def fetch_pdbs(fasta_file, output_dir):
+def fetch_pdbs(fasta_file_path, output_dir) -> str:
     """
-    Fetches and stores PDB files in a specified output directory with a given fasta file.
+    Fetches and stores PDB files in a specified output directory with a given fasta_file_path.
     The contents of the output dir will be overwritten.
-    It also returns a cleaned fasta file containing only the sequences that have been successfully downloaded.
+    It also returns a cleaned fasta file containing only the sequences that have been successfully downloaded and saves it in the same dir as the given fasta_file.
     """
-    parsed_fasta = SeqIO.parse(fasta_file, "fasta")
+    parsed_fasta = SeqIO.parse(fasta_file_path, "fasta")
     number_of_uids = 0
     number_of_failed_downloads = 0
     # get dir of fasta_file
-    fasta_dir = os.path.dirname(fasta_file)
-    cleaned_fasta_file = os.path.join(fasta_dir, "cleaned.fasta")
+    fasta_file_name = os.path.basename(fasta_file_path).split(".")[0]
+    fasta_dir = os.path.dirname(fasta_file_path)
+    cleaned_fasta_file = os.path.join(fasta_dir, f"{fasta_file_name}_cleaned.fasta")
     # delete old PDB files if they exist
     if os.path.exists(output_dir):
         delete_dir_content(output_dir)

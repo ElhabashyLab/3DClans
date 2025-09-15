@@ -1,5 +1,6 @@
 from Bio import Entrez, SeqIO
 from Bio.Blast import NCBIWWW, NCBIXML
+import os
 
 class DatasetGenerator:
     """
@@ -7,17 +8,21 @@ class DatasetGenerator:
     Each cluster is defined by a seed sequence and contains very similar sequences.
     The remaining sequences of a cluster are obtained by blasting the seed sequence.
     """    
-    def __init__(self):
+    def __init__(self, output_dir="example_files/generated_fasta"):
         self.Entrez_email = "aron.wichtner@tuebingen.mpg.de"
         self.psiblast_results_path = "Dataset_Generator/psiblast_results.xml"
+        self.output_dir = output_dir
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
 
-    def generate(self, n: int, n_cl: int, seeds: list[str]) -> str:
+    def generate(self, n: int, n_cl: int, seeds: list[str], file_name) -> str:
         """
         Generates a fasta file with n sequences grouped into n_cl clusters.
         :param n: number of sequences
         :param n_cl: number of clusters
         :param seeds: list of seed sequences (uids)
+        :param file_name: name of the output fasta file
         :return: path to the generated fasta file
         """
         self._check_for_correct_input(n, n_cl, seeds)
@@ -31,8 +36,8 @@ class DatasetGenerator:
             print(f"Finding similar sequences for cluster {i + 1}...")
             records_of_similar_sequences = self.get_records_of_similar_sequences(seed_record, n // n_cl - 1, i)
             fasta_records.extend(records_of_similar_sequences)
-        # save the generated fasta content to a file
-        output_path = f"example_files/generated_fasta/{n}_seq_{n_cl}_clusters.fasta"
+        # save the generated fasta content to a file in self.output_dir
+        output_path = f"{self.output_dir}/{file_name}"
         print(f"Saving fasta file at {output_path}")
         SeqIO.write(fasta_records, output_path, "fasta")
         return output_path
@@ -164,6 +169,7 @@ class DatasetGenerator:
 
             
 # test
-seeds = ["P68871", "Q99895", "P42212"]
-generator = DatasetGenerator()
-generator.generate(30, 3, seeds)
+# other possible seeds: "Q99895", "P42212"
+# seeds = ["P68871"]
+# generator = DatasetGenerator()
+# generator.generate(30, 1, seeds, "test.fasta")

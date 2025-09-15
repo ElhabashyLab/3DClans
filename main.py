@@ -69,7 +69,6 @@ def _set_up_parser():
         help="specifies the scoring method to use for Foldseek (default: evalue)",
         
     )
-
     return parser
 
 
@@ -87,10 +86,8 @@ def main():
         foldseek_score = args.score
         scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
         clans_generator = ClansFileGenerator()
-        # fasta to pdb conversion
         cleaned_input_file = fetch_pdbs(input_file, "PDBs")
         scores = scores_computer.run(selected_tool, "PDBs")
-        # clans file generation
         clans_file_path = clans_generator.generate_clans_file(scores, cleaned_input_file)
     else:
         raise ValueError("Please specify either a fasta or clans file as input.")

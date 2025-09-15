@@ -3,12 +3,12 @@ import os
 import pandas as pd
 from io import StringIO
 from fasta2PDB import delete_dir_content
-"""
-This class extends the StructSimTool class to implement the USalign tool for protein structure comparison.
-"""
 
 
 class USalign(StructSimTool):
+    """
+    This class extends the StructSimTool class to implement the USalign tool for protein structure comparison.
+    """
     def __init__(self):
         description = "A tool for protein structure comparison using USalign."
         if os.path.exists("USalign_working_dir"):
