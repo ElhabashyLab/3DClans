@@ -33,6 +33,7 @@ class ScoresEvaluator:
         self.generated_datasets_dir = f"{self.working_dir}/generated_datasets"
         self.pdbs_dir = f"{self.working_dir}/PDBs"
         self.clans_files_dir = f"{self.working_dir}/clans_files"
+        self.clans_files_seqsim_dir = f"{self.working_dir}/clans_files_seqsim"
         for dir_path in [self.generated_datasets_dir, self.pdbs_dir, self.clans_files_dir]:
             delete_dir_content(dir_path)
         os.makedirs(self.pdbs_dir, exist_ok=True)
@@ -49,6 +50,16 @@ class ScoresEvaluator:
         self._download_pdbs()
         scores_for_each_dataset = self._compute_scores()
         self._compute_clans_files(scores_for_each_dataset)
+        self._compute_clans_files_seqsim()
+        
+        
+    def _compute_clans_files_seqsim(self):
+        """
+        Generates clans files with scores based on sequence similarity for each dataset.
+        The clans files are saved in the self.clans_files_seqsim_dir.
+        The clans files are generated with the old clans.jar application in headless mode.
+        """
+        raise NotImplementedError("This method is not implemented yet.")
         
         
     def _compute_clans_files(self, scores_for_each_dataset: dict):
