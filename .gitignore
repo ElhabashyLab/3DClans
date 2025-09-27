@@ -15,3 +15,4 @@ Dataset_Generator/psiblast_results.xml
 Scores_Evaluation/clans_files/*
 Scores_Evaluation/generated_datasets/*
 Scores_Evaluation/PDBs/*
+dbs

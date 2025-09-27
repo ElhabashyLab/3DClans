@@ -25,7 +25,7 @@ def download_file(url, output_path):
 
 def delete_dir_content(dir_path):
         """
-        Deletes the content of the specified directory.
+        Deletes the content of the specified directory and creates it if it does not exists.
         """
         if os.path.exists(dir_path):
             shutil.rmtree(dir_path)

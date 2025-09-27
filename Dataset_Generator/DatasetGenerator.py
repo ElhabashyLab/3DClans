@@ -1,6 +1,9 @@
+import subprocess
 from Bio import Entrez, SeqIO
 from Bio.Blast import NCBIWWW, NCBIXML
 import os
+from io import StringIO
+
 
 class DatasetGenerator:
     """
@@ -29,12 +32,12 @@ class DatasetGenerator:
         fasta_records = []
         for i in range(n_cl):
             seed_uid = seeds[i]
-            seed_record = self._download_seed_records(seed_uid, i)
-            seed_record = self._clean_fasta_header(seed_record)
-            fasta_records.append(seed_record)
+            seed_record = self._download_seed_record(seed_uid, i)
+            seed_record_cleaned = self._clean_fasta_header(seed_record)
+            fasta_records.append(seed_record_cleaned)
             # blast for n/n_cl - 1 similar sequences
             print(f"Finding similar sequences for cluster {i + 1}...")
-            records_of_similar_sequences = self.get_records_of_similar_sequences(seed_record, n // n_cl - 1, i)
+            records_of_similar_sequences = self.get_records_of_similar_sequences(seed_record_cleaned, n // n_cl - 1, i)
             fasta_records.extend(records_of_similar_sequences)
         # save the generated fasta content to a file in self.output_dir
         output_path = f"{self.output_dir}/{file_name}"
@@ -43,9 +46,9 @@ class DatasetGenerator:
         return output_path
     
     
-    def _download_seed_records(self, seed_uid, i):
+    def _download_seed_record(self, seed_uid, i):
         """
-        Downloads the seed sequences from NCBI.
+        Downloads the seed sequence from NCBI.
         :param seed_uid: UID of the seed sequence
         :param i: index of the cluster of the seed
         :return: list of SeqRecord objects
@@ -74,7 +77,7 @@ class DatasetGenerator:
     
     def _download_sequences(self, uids: list):
         """
-        Downloads a protein sequence from NCBI given its UID.
+        Downloads protein sequences from NCBI given their UIDs.
         :param uid: the UID of the sequence
         :return: the sequence as a string
         """
@@ -90,7 +93,7 @@ class DatasetGenerator:
         """
         PSI-Blasts a protein record.
         :param record: the protein record to blast
-        :return: result of BLAST
+        :return: result of PSI-BLAST
         """
         # Run PSI-BLAST with the fetched sequence
         result_handle = NCBIWWW.qblast(
@@ -111,26 +114,24 @@ class DatasetGenerator:
         :param i: index of the cluster
         :return: list of SeqRecord objects
         """
-        results_handle = self._blast_sequence(record)
-        self._save_to_file(self.psiblast_results_path, results_handle.read())
-        results_handle.close()
-        similar_records = self._parse_hits(num_sequences)
+        blast_results = self._blast_sequence(record)
+        similar_records = self._parse_hits(num_sequences, blast_results)
         for record in similar_records:
             record.description = f"Cluster_{i+1}_Similar"
         print(f"Downloaded {len(similar_records)} of {num_sequences} similar sequences for cluster {i + 1}.")
         return similar_records
 
 
-    def _parse_hits(self, max_hits):
+    def _parse_hits(self, max_hits, blast_results):
         """
-        Parses the BLAST hits from the XML result file.
+        Parses the PSI-BLAST hits from the XML result file.
         :param max_hits: maximum number of similar records to retrieve
+        :param blast_results: the result of PSI-BLAST as a file-like object
         :return: list of SeqRecord objects not longer than max_hits
         """
         fasta_records = []
         hit_ids = []
-        with open(self.psiblast_results_path) as f:
-            blast_records = list(NCBIXML.parse(f))
+        blast_records = list(NCBIXML.parse(blast_results))
         # get results of the last PSI iteration
         final_blast_record = blast_records[-1]
         for alignment in final_blast_record.alignments:
@@ -169,7 +170,8 @@ class DatasetGenerator:
 
             
 # test
-# other possible seeds: "Q99895", "P42212"
-# seeds = ["P68871"]
-# generator = DatasetGenerator()
-# generator.generate(30, 1, seeds, "test.fasta")
+example_seeds = ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5", "Q8N3C0", "P00519", "P00846", "P00390", "P02754", "Q8RWR1"]
+generator = DatasetGenerator()
+#generator.generate(15, 1, ["Q99895"], "test.fasta")
+#for i in range(4):
+    #generator.generate(15, 3, example_seeds[i*3:(i+1)*3], f"example_{i+1}.fasta")
