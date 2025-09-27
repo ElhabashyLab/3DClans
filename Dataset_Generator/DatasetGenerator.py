@@ -108,23 +108,25 @@ class DatasetGenerator:
     
     def get_records_of_similar_sequences(self, record, num_sequences, i):
         """
-        Retrieves records of sequences similar to the given record sequence.
+        Retrieves records of sequences similar to the given record sequence and makes sure the querry record is not included.
         :param record: the record to compare
         :param num_sequences: number of similar records to retrieve
         :param i: index of the cluster
         :return: list of SeqRecord objects
         """
         blast_results = self._blast_sequence(record)
-        similar_records = self._parse_hits(num_sequences, blast_results)
+        similar_records = self._parse_hits(record, num_sequences, blast_results)
         for record in similar_records:
             record.description = f"Cluster_{i+1}_Similar"
         print(f"Downloaded {len(similar_records)} of {num_sequences} similar sequences for cluster {i + 1}.")
         return similar_records
 
 
-    def _parse_hits(self, max_hits, blast_results):
+    def _parse_hits(self, seed_record, max_hits, blast_results):
         """
-        Parses the PSI-BLAST hits from the XML result file.
+        Parses the PSI-BLAST hits from the XML result file and downloads the corresponding sequences from NCBI.
+        It leaves out the seed sequence if it is among the hits.
+        :param seed_record: the blast query record
         :param max_hits: maximum number of similar records to retrieve
         :param blast_results: the result of PSI-BLAST as a file-like object
         :return: list of SeqRecord objects not longer than max_hits
@@ -136,7 +138,7 @@ class DatasetGenerator:
         final_blast_record = blast_records[-1]
         for alignment in final_blast_record.alignments:
             accession = alignment.accession
-            if accession not in hit_ids and len(hit_ids) < max_hits:
+            if accession not in hit_ids and len(hit_ids) < max_hits and accession != seed_record.id:
                 hit_ids.append(accession)
             else:
                 break
@@ -172,6 +174,6 @@ class DatasetGenerator:
 # test
 example_seeds = ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5", "Q8N3C0", "P00519", "P00846", "P00390", "P02754", "Q8RWR1"]
 generator = DatasetGenerator()
-#generator.generate(15, 1, ["Q99895"], "test.fasta")
+#generator.generate(15, 2, ["P68871", "Q99895"], "test.fasta")
 #for i in range(4):
     #generator.generate(15, 3, example_seeds[i*3:(i+1)*3], f"example_{i+1}.fasta")
