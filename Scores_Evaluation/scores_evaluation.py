@@ -1,5 +1,5 @@
 from Dataset_Generator.DatasetGenerator import DatasetGenerator
-from old_clans.utils_old_clans import run_multiple_clans_headless
+from old_clans.utils_old_clans import run_clans_headless
 from fasta2PDB import *
 from StructSimComputer import StructSimComputer
 from ClansFileGenerator import ClansFileGenerator
@@ -14,7 +14,7 @@ class ScoresEvaluator:
     With the generated data, the structure similarity scores and sequence similarity scores are computed and clans files anre generated.
     The comparison is done with the scores as well as with inferred graphs and clusters.
     """
-    def __init__(self, number_of_datasets, size_of_datasets, seeds, path_to_recovered_clans: str = "/home/aronw/Development/clans-recovered", use_existing_datasets: bool = False):
+    def __init__(self, number_of_datasets, size_of_datasets, seeds, path_to_recovered_clans: str = "/home/aronw/Development/clans-recovered"):
         self._check_for_correct_input(number_of_datasets, seeds)
         self.size_of_datasets = size_of_datasets
         self.working_dir = "Scores_Evaluation"
@@ -33,8 +33,9 @@ class ScoresEvaluator:
         """
         self.generated_datasets_dir = f"{self.working_dir}/generated_datasets"
         self.pdbs_dir = f"{self.working_dir}/PDBs"
-        self.clans_files_dir = f"{self.working_dir}/clans_files_structsim" # dir for output of clans files generated with structure similarity scores
-        self.clans_files_seqsim_dir = f"{self.working_dir}/clans_files_seqsim" # dir for output of clans runs with old software
+        self.clans_files_dir = f"{self.working_dir}/clans_files_structsim" # dir for clans files generated with structure similarity scores
+        self.clans_files_seqsim_dir = f"{self.working_dir}/clans_files_seqsim" # dir for clans files generated with sequence similarity scores
+        self.blast_dir = f"{self.working_dir}/blast_files"
         for dir_path in [self.generated_datasets_dir, self.pdbs_dir, self.clans_files_dir]:
             delete_dir_content(dir_path)
 
@@ -45,15 +46,17 @@ class ScoresEvaluator:
         After it runs the old recovered clans on the generated clans files and saves the updated clans files.
         This function should be called before running the actual evaluation.
         """
-        print("Running scores evaluation with generated datasets ...")
+        print("Initializing evaluation...")
         self._generate_datasets(self.number_of_datasets, self.size_of_datasets, self.seeds)
         self._download_pdbs(self.generated_datasets_dir, self.pdbs_dir)
         scores_for_each_dataset = self._compute_scores(self.pdbs_dir, self.number_of_datasets)
         self._compute_clans_files(scores_for_each_dataset, self.generated_datasets_dir, self.number_of_datasets)
         # input clans files will be overwritten with updated clans files
-        input_output_files_for_struct_clans_files = self.generate_input_output_files_dict(self.clans_files_dir)
-        run_multiple_clans_headless(self.path_to_recovered_clans, input_output_files_for_struct_clans_files)
-        
+        input_output_dict_structural = self.generate_input_output_files_dict(self.clans_files_dir, False)
+        input_output_dict_sequence = self.generate_input_output_files_dict(self.clans_files_seqsim_dir, False)
+        run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type="clans")
+        run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type="fasta", blast_dir=self.blast_dir)
+    
     
     def generate_input_output_files_dict(self, input_files_dir, overwrite: bool = False):
         """
