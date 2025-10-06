@@ -21,6 +21,7 @@ class Benchmark:
         in the PDBs_for_benchmark directory. If 'run_with_PDBs_for_benchmark' is True, it will run the benchmark with already downloaded PDB files.
         In this case it does not matter if 'fasta_file' is given.
         """
+        start = time.time()
         self.struct_sim_computer = StructSimComputer()
         self.results = {}
         if run_with_PDBs_for_benchmark:
@@ -30,6 +31,8 @@ class Benchmark:
                 return
             else:
                 self.data = "PDBs_for_benchmark"
+                end = time.time()
+                print(f"Benchmark environment setup complete after {end - start:.4f} seconds.")
             return
         else:
             if fasta_file is None:
@@ -38,7 +41,8 @@ class Benchmark:
                 print(f"Setting up benchmark environment with {fasta_file}...")
                 fetch_pdbs(fasta_file, "PDBs_for_benchmark")
                 self.data = "PDBs_for_benchmark"
-                print("Benchmark environment setup complete. PDB files downloaded to './PDBs_for_benchmark'.")
+                end = time.time()
+                print(f"Benchmark environment setup complete after {end - start:.4f} seconds. PDB files downloaded to './PDBs_for_benchmark'.")
     
     
     def run_benchmark(self):
@@ -62,6 +66,6 @@ class Benchmark:
 
 
 # test
-fasta_file = "./example_files/small_fasta_files/small_dataset.fasta"
+fasta_file = "./example_files/big_fasta_files/500.fasta"
 benchmark = Benchmark(fasta_file=fasta_file, run_with_PDBs_for_benchmark=False)
 results = benchmark.run_benchmark()
