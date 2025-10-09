@@ -100,7 +100,7 @@ class DatasetGenerator:
             program="blastp",
             database="swissprot", # makes sure sequences have structures in alphafold DB
             sequence=str(record.seq),
-            service="psi",
+            service="psi", # for normal blast use: "plain"
             word_size=3
         )
         return result_handle

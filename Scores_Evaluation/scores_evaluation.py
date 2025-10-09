@@ -5,7 +5,9 @@ from StructSimComputer import StructSimComputer
 from ClansFileGenerator import ClansFileGenerator
 from ToolType import ToolType
 import os
+from pathlib import Path
 
+CLUSTER_ROUNDS = 100000
 
 class ScoresEvaluator:
     """
@@ -18,25 +20,28 @@ class ScoresEvaluator:
         self._check_for_correct_input(number_of_datasets, seeds)
         self.size_of_datasets = size_of_datasets
         self.working_dir = "Scores_Evaluation"
-        self._set_up_dirs()
-        self.dataset_generator = DatasetGenerator(self.generated_datasets_dir)
+        # self._set_up_dirs()
+        self.dataset_generator = DatasetGenerator() #should contain self.generated_datasets_dir
         self.scores_computer = StructSimComputer()
         self.tool_type = ToolType.FOLDSEEK
-        self.clans_generator = ClansFileGenerator(self.clans_files_dir)   
+        self.struct_clans_generator = ClansFileGenerator() # should contain self.clans_files_structsim_dir
+        self.seq_clans_generator = ClansFileGenerator() # should contain self.clans_files_seqsim_dir
         self.path_to_recovered_clans = path_to_recovered_clans
         
         
     def _set_up_dirs(self):
         """
         Sets up the necessary directories for the evaluation.
-        Creates directories for generated datasets, PDB files and clans files and overwrites them if they already exist.
+        Creates directories for generated datasets, pdbs, clans files and blast files.
+        Deletes the content of the directories if they already exist.
         """
-        self.generated_datasets_dir = f"{self.working_dir}/generated_datasets"
-        self.pdbs_dir = f"{self.working_dir}/PDBs"
-        self.clans_files_dir = f"{self.working_dir}/clans_files_structsim" # dir for clans files generated with structure similarity scores
-        self.clans_files_seqsim_dir = f"{self.working_dir}/clans_files_seqsim" # dir for clans files generated with sequence similarity scores
-        self.blast_dir = f"{self.working_dir}/blast_files"
-        for dir_path in [self.generated_datasets_dir, self.pdbs_dir, self.clans_files_dir]:
+        abs_path_working_dir = os.path.abspath(self.working_dir)
+        self.generated_datasets_dir = f"{abs_path_working_dir}/generated_datasets"
+        self.pdbs_dir = f"{abs_path_working_dir}/PDBs"
+        self.clans_files_structsim_dir = f"{abs_path_working_dir}/clans_files_structsim" # dir for clans files generated with structure similarity scores
+        self.clans_files_seqsim_dir = f"{abs_path_working_dir}/clans_files_seqsim" # dir for clans files generated with sequence similarity scores
+        self.blast_dir = f"{abs_path_working_dir}/blast_files"
+        for dir_path in [self.generated_datasets_dir, self.pdbs_dir, self.clans_files_structsim_dir]:
             delete_dir_content(dir_path)
 
 
@@ -51,31 +56,70 @@ class ScoresEvaluator:
         self._download_pdbs(self.generated_datasets_dir, self.pdbs_dir)
         scores_for_each_dataset = self._compute_scores(self.pdbs_dir, self.number_of_datasets)
         self._compute_clans_files(scores_for_each_dataset, self.generated_datasets_dir, self.number_of_datasets)
-        # input clans files will be overwritten with updated clans files
-        input_output_dict_structural = self.generate_input_output_files_dict(self.clans_files_dir, False)
-        input_output_dict_sequence = self.generate_input_output_files_dict(self.clans_files_seqsim_dir, False)
-        run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type="clans")
-        run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type="fasta", blast_dir=self.blast_dir)
+        print("Running recovered clans.jar on the generated structural clans files...")
+        input_output_dict_structural = self._generate_input_output_files_dict(self.clans_files_structsim_dir, self.clans_files_structsim_dir)
+        run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type="clans", rounds=CLUSTER_ROUNDS)
+        self._remove_colorcutoffs_colorarr(self.clans_files_structsim_dir)
+        print("Running recovered clans.jar with sequences similarity scores...")
+        input_output_dict_sequence = self._generate_input_output_files_dict(self.generated_datasets_dir, self.clans_files_seqsim_dir)
+        run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type="fasta", blast_dir=self.blast_dir, clans_generator=self.seq_clans_generator, rounds=CLUSTER_ROUNDS)
+        self._remove_colorcutoffs_colorarr(self.clans_files_seqsim_dir)
+        print("Evaluation initialized. Clans files generated and clustered for each dataset with structure similarity scores and sequence similarity scores.")
+
+
+    def _remove_colorcutoffs_colorarr(self, clans_files_dir):
+        """
+        Fixes a temporary bug in the recovered clans code.
+        This function is a temporary workaround and should be removed once the bug is fixed in the recovered clans code.
+        After the clustering process the clans files contain 2 lines starting with colorcutoffs and colorarr with missing values.
+        This function removes those lines from the clans files in the given directory so they can be loaded again.
+        """
+        for file in os.listdir(clans_files_dir):
+            if file.endswith("_out.clans"):
+                file_path = os.path.join(clans_files_dir, file)
+                with open(file_path, "r") as f:
+                    lines = f.readlines()
+                with open(file_path, "w") as f:
+                    for line in lines:
+                        if line.startswith("colorcutoffs") or line.startswith("colorarr"):
+                            continue # remove buggy lines
+                        f.write(line)
     
     
-    def generate_input_output_files_dict(self, input_files_dir, overwrite: bool = False):
+    def evaluate(self):
+        """
+        Evaluates the clustered clans files generated with structure similarity scores and sequence similarity scores.
+        """
+        # generate dict which maps sturctural clans file to sequence clans file
+        # 
+        raise NotImplementedError("Evaluation not implemented yet.")
+    
+        
+    def _generate_input_output_files_dict(self, input_files_dir, output_files_dir):
         """
         Generates a dictionary mapping input files to output files.
-        If overwrite is True, the output files will be saved in the same directory as the input files and overwrite them.
-        If overwrite is False, the output files will be saved with a "_out" suffix.
+        It appends "_out" to the output file names.
         Args:
             input_files_dir: Directory containing the input files.
-            overwrite: Whether to overwrite the input files or save the output files with a "_out" suffix.
+            output_files_dir: Directory where the output files will be saved.
         Returns:
-            dict: A dictionary mapping input files to output files.
+            dict: A dictionary mapping absolute input file paths to absolute output file paths.
         """
         input_output_files = {}
+
         for file in os.listdir(input_files_dir):
-            if overwrite:
-                input_output_files[os.path.abspath(os.path.join(input_files_dir, file))] = os.path.abspath(os.path.join(input_files_dir, file))
-            else:
-                input_output_files[os.path.abspath(os.path.join(input_files_dir, file))] = os.path.abspath(os.path.join(input_files_dir, file.replace(".clans", "_out.clans")))
-        print(f"Generated input-output files dict: {input_output_files}")
+            # only use files that contain "cleaned" in the name
+            if "cleaned" not in file:
+                continue
+
+            base_name = os.path.splitext(file)[0]
+            output_file_name = f"{base_name}_out.clans"
+
+            input_file_path = os.path.abspath(os.path.join(input_files_dir, file))
+            output_file_path = os.path.abspath(os.path.join(output_files_dir, output_file_name))
+
+            input_output_files[input_file_path] = output_file_path
+
         return input_output_files
 
 
@@ -90,7 +134,7 @@ class ScoresEvaluator:
         """
         for i in range(number_of_datasets):
             cleaned_dataset_i_path = os.path.join(generated_datasets_dir, f"dataset_{i+1}_cleaned.fasta")
-            self.clans_generator.generate_clans_file(scores_for_each_dataset[i], cleaned_dataset_i_path)
+            self.struct_clans_generator.generate_clans_file(scores_for_each_dataset[i], cleaned_dataset_i_path)
 
     
     def _compute_scores(self, pdbs, number_of_datasets):
@@ -167,6 +211,6 @@ class ScoresEvaluator:
             self.seeds = seeds
             
     
-# test
-evaluator = ScoresEvaluator(2, 20, ["Q99895", "P42212"])
-evaluator._initialize_evaluation()
+# test ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5"]
+evaluator = ScoresEvaluator(3, 30,  ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5"])
+# evaluator._initialize_evaluation()

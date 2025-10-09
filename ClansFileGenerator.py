@@ -20,6 +20,9 @@ class ClansFileGenerator:
         """
         Generates a CLANS input file from a fasta file and the pairwise similarity scores of the sequences.
         Returns the path to the generated CLANS file.
+        Args:
+            scores: A pandas DataFrame containing the pairwise similarity scores.
+            fasta: A path to the input fasta file.
         """
         print(f"Generating CLANS file in {self.output_dir}...")
         uids = extract_uids_from_fasta(fasta)
@@ -49,6 +52,10 @@ class ClansFileGenerator:
             0     1      0.8
             0     2      0.7
             1     2      0.6
+        3. Drops duplicate lines (f.e. 0 1 0.8 and 1 0 0.8).
+        
+        (Duplicate lines should not be in the scores becauese the scores can still be different for PDBchain1 with PDBchain2
+        and PDBchain2 with PDBchain1!))
         
         example:
         
@@ -59,6 +66,7 @@ class ClansFileGenerator:
         scores:
             PDBchain1  PDBchain2   score
             A0A836ZK00 A0A2W5V1G2 0.4469
+            A0A2W5V1G2 A0A836ZK00 0.4469
             A0A836ZK00 A0A2M8UWB6 0.4481
             A0A2M8UWB6 A0A2W5V1G2 0.8499
         transformed scores:
@@ -80,6 +88,8 @@ class ClansFileGenerator:
         scores1 = scores1.drop(columns=["PDBchain1_new", "PDBchain2_new"])
         # order the pairs
         scores1 = scores1.sort_values(by=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
+        # drop duplicates
+        scores1 = scores1.drop_duplicates(subset=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
         return scores1
 
 

@@ -99,20 +99,10 @@ def fetch_pdbs(fasta_file_path, output_dir) -> str:
         for record in parsed_fasta:
             number_of_uids += 1
             uid = extract_uid_from_recordID(record.id)
-            url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v4.pdb"
+            url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v6.pdb"
             if download_file(url, output_dir + f"/{uid}.pdb"):
                 SeqIO.write(record, file, "fasta")
             else:
                 number_of_failed_downloads += 1
     print(f"Downloaded {number_of_uids - number_of_failed_downloads} from {number_of_uids} PDB files successfully.")
     return cleaned_fasta_file
-
-
-"""
-example test:
-uids = extract_uids_from_fasta("example_files/combined.fasta")
-fetch_pdbs_from_uids(uids, "./PDBs")
-"""
-
-
-
