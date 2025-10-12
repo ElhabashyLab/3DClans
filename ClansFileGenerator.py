@@ -7,6 +7,7 @@ import numpy as np
 class ClansFileGenerator:
     """
     This class is responsible for generating a CLANS input file from a fasta file.
+    It is also able to parse CLANS files and extract the relevant information.
     """
     def __init__(self, output_dir="clans_files"):
         self.output_dir = output_dir
@@ -15,6 +16,20 @@ class ClansFileGenerator:
         else:
             os.makedirs(self.output_dir)
 
+    
+    def parse_clans_file(self, clans_file_path):
+        """
+        Parses a CLANS input file and extracts the relevant information.
+        Returns a ClansFile object.
+        Args:
+            clans_file_path: A path to the input CLANS file.
+        """
+        print(f"Parsing CLANS file {clans_file_path}...")
+        with open(clans_file_path, 'r') as file:
+            content = file.read()
+        clans_file = ClansFile.from_string(content)
+        return clans_file
+    
 
     def generate_clans_file(self, scores, fasta):
         """
