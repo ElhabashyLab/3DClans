@@ -91,7 +91,7 @@ class ClansFile:
             left, right = line.split(":")
             pdb1, pdb2 = left.split()
             score = right
-            scores_data.append({"PDBchain1": int(pdb1), "PDBchain2": int(pdb2), "score": score})
+            scores_data.append({"PDBchain1": int(pdb1), "PDBchain2": int(pdb2), "score": float(score)})
         scores_df = pd.DataFrame(scores_data)
         return scores_df
     
