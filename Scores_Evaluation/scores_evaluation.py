@@ -260,6 +260,6 @@ class ScoresEvaluator:
             
     
 # test ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5"]
-evaluator = ScoresEvaluator(3, 30,  ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5"])
-evaluator._initialize_evaluation()
+# evaluator = ScoresEvaluator(3, 30,  ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5"])
+# evaluator._initialize_evaluation()
 # structural_to_sequence = evaluator.match_clans_files_for_comparison("Scores_Evaluation/clans_files_structsim", "Scores_Evaluation/clans_files_seqsim")

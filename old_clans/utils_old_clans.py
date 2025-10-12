@@ -96,11 +96,30 @@ def run_clans_headless(recovered_clans_path: str, input_output_files: dict, inpu
             run_clans_headless_from_f_file(recovered_clans_path, input_file, output_file, blast_dir, clans_generator, rounds)
         else:
             raise ValueError(f"Invalid input file type: {input_file_type}. Supported types are 'clans' and 'fasta'.")
+        _remove_colorcutoffs_colorarr(output_file)
 
+
+def _remove_colorcutoffs_colorarr(clans_file):
+        """
+        Fixes a temporary bug in the recovered clans code.
+        This function is a temporary workaround and should be removed once the bug is fixed in the recovered clans code.
+        After the clustering process the clans files contain 2 lines starting with colorcutoffs and colorarr with missing values.
+        This function removes those lines from the clans files in the given directory so they can be loaded again.
+        Args:
+            clans_files: A path to the the clans file to be fixed.
+        """
+        with open(clans_file, "r") as f:
+            lines = f.readlines()
+        with open(clans_file, "w") as f:
+            for line in lines:
+                if line.startswith("colorcutoffs") or line.startswith("colorarr"):
+                    continue # remove buggy lines
+                f.write(line)
+    
 
 #test
-PATH_TO_RECOVERED_CLANS = "/home/aronw/Development/clans-recovered"
-input_file = "/home/aronw/Development/Clans-3D/Scores_Evaluation/clans_files_seqsim/dataset_1_cleaned.clans"
-output_file = "/home/aronw/Development/Clans-3D/Scores_Evaluation/clans_files_seqsim/dataset_1_cleaned_updated.clans"
-dict_test = {input_file: output_file}
+#PATH_TO_RECOVERED_CLANS = "/home/aronw/Development/clans-recovered"
+#input_file = "/home/aronw/Development/clans_files_seqsim/dataset_1_cleaned.clans"
+#output_file = "/home/aronw/Development/clans_files_seqsim/dataset_1_cleaned_updated.clans"
+#dict_test = {input_file: output_file}
 #run_clans_headless(PATH_TO_RECOVERED_CLANS, dict_test)

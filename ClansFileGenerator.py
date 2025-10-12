@@ -17,7 +17,8 @@ class ClansFileGenerator:
             os.makedirs(self.output_dir)
 
     
-    def parse_clans_file(self, clans_file_path):
+    @staticmethod
+    def parse_clans_file(clans_file_path):
         """
         Parses a CLANS input file and extracts the relevant information.
         Returns a ClansFile object.
