@@ -1,8 +1,6 @@
-import subprocess
 from Bio import Entrez, SeqIO
 from Bio.Blast import NCBIWWW, NCBIXML
 import os
-from io import StringIO
 
 
 class DatasetGenerator:
