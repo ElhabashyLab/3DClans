@@ -5,7 +5,8 @@ from StructSimComputer import StructSimComputer
 from ClansFileGenerator import ClansFileGenerator
 from ToolType import ToolType
 import os
-from pathlib import Path
+import pandas as pd 
+
 
 CLUSTER_ROUNDS = 100000
 
@@ -20,12 +21,12 @@ class ScoresEvaluator:
         self._check_for_correct_input(number_of_datasets, seeds)
         self.size_of_datasets = size_of_datasets
         self.working_dir = "Scores_Evaluation"
-        # self._set_up_dirs()
-        self.dataset_generator = DatasetGenerator() #should contain self.generated_datasets_dir
+        self._set_up_dirs()
+        self.dataset_generator = DatasetGenerator(self.generated_datasets_dir)
         self.scores_computer = StructSimComputer()
         self.tool_type = ToolType.FOLDSEEK
-        self.struct_clans_generator = ClansFileGenerator() # should contain self.clans_files_structsim_dir
-        self.seq_clans_generator = ClansFileGenerator() # should contain self.clans_files_seqsim_dir
+        self.struct_clans_generator = ClansFileGenerator(self.clans_files_structsim_dir)
+        self.seq_clans_generator = ClansFileGenerator(self.clans_files_seqsim_dir)
         self.path_to_recovered_clans = path_to_recovered_clans
         
         
@@ -41,7 +42,7 @@ class ScoresEvaluator:
         self.clans_files_structsim_dir = f"{abs_path_working_dir}/clans_files_structsim" # dir for clans files generated with structure similarity scores
         self.clans_files_seqsim_dir = f"{abs_path_working_dir}/clans_files_seqsim" # dir for clans files generated with sequence similarity scores
         self.blast_dir = f"{abs_path_working_dir}/blast_files"
-        for dir_path in [self.generated_datasets_dir, self.pdbs_dir, self.clans_files_structsim_dir]:
+        for dir_path in [self.generated_datasets_dir, self.pdbs_dir, self.clans_files_structsim_dir, self.blast_dir, self.clans_files_seqsim_dir]:
             delete_dir_content(dir_path)
 
 
@@ -86,15 +87,62 @@ class ScoresEvaluator:
                         f.write(line)
     
     
-    def evaluate(self):
+    def evaluate(self, structural_to_sequence_clans_files: dict):
         """
         Evaluates the clustered clans files generated with structure similarity scores and sequence similarity scores.
+        Returns a dataframe with the evaluation results consisting of numerical comparison, graph comparison and cluster comparison.
+        Args:
+            structural_to_sequence_clans_files: A dictionary mapping structural clans file paths to sequence clans file paths.
         """
-        # generate dict which maps sturctural clans file to sequence clans file
-        # 
-        raise NotImplementedError("Evaluation not implemented yet.")
+        df_evaluation_combined = pd.DataFrame()
+        for struct_clans_file, seq_clans_file in structural_to_sequence_clans_files.items():
+            print(f"Evaluating structural clans file {struct_clans_file} with sequence clans file {seq_clans_file}...")
+            df_numerical_comparison = self._compare_nmerically(struct_clans_file, seq_clans_file)
+            df_graphs_comparison = self._compare_graphs(struct_clans_file, seq_clans_file)
+            df_clusters_comparison = self._compare_clusters(struct_clans_file, seq_clans_file)
+            df_evaluation_combined = pd.concat([df_numerical_comparison, df_graphs_comparison, df_clusters_comparison], axis=1)
+        print("Evaluation completed.")
+        return df_evaluation_combined
     
-        
+    
+    def _compare_nmerically(self, struct_clans_file, seq_clans_file):
+        """
+        Compares the structural clans file with the sequence clans file numerically.
+        Returns a dataframe with the comparison results.
+        """
+        raise NotImplementedError("Numerical comparison not implemented yet.")
+    
+    
+    def _compare_graphs(self, struct_clans_file, seq_clans_file):
+        """
+        Compares the graphs inferred from the structural clans file with the graphs inferred from the sequence clans file.
+        Returns a dataframe with the comparison results.
+        """
+        raise NotImplementedError("Graph comparison not implemented yet.")
+    
+    
+    def _compare_clusters(self, struct_clans_file, seq_clans_file):
+        """
+        Compares the clusters inferred from the structural clans file with the clusters inferred from the sequence clans file.
+        Returns a dataframe with the comparison results.
+        """
+        raise NotImplementedError("Cluster comparison not implemented yet.")
+    
+    
+    def match_clans_files_for_comparison(self, structural_clans_dir, sequence_clans_dir):
+        """
+        This method matches the clans files generated with structure similarity scores to the clans files generated with sequence similarity scores.
+        It returns a dictionary which maps the structural clans file path to the sequence clans file path.
+        """
+        structural_to_sequence = {}
+        for struct_file in os.listdir(structural_clans_dir):
+            if not struct_file.endswith("_out.clans"):
+                continue
+            seq_file = struct_file
+            structural_to_sequence[os.path.join(structural_clans_dir, struct_file)] = os.path.join(sequence_clans_dir, seq_file)
+        return structural_to_sequence
+
+
     def _generate_input_output_files_dict(self, input_files_dir, output_files_dir):
         """
         Generates a dictionary mapping input files to output files.
@@ -213,4 +261,5 @@ class ScoresEvaluator:
     
 # test ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5"]
 evaluator = ScoresEvaluator(3, 30,  ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5"])
-# evaluator._initialize_evaluation()
+evaluator._initialize_evaluation()
+# structural_to_sequence = evaluator.match_clans_files_for_comparison("Scores_Evaluation/clans_files_structsim", "Scores_Evaluation/clans_files_seqsim")
