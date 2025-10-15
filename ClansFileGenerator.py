@@ -26,7 +26,6 @@ class ClansFileGenerator:
             clans_file_path: A path to the input CLANS file.
         """
         print(f"Parsing CLANS file {clans_file_path}...")
-        print("debug 3")
         with open(clans_file_path, 'r') as file:
             content = file.read()
         clans_file = ClansFile.from_string(content)
