@@ -56,6 +56,16 @@ class ClansFile:
         content = self._add_coordinates_to_content(content)
         content = self._add_scores_to_content(content)
         return "\n".join(content)
+    
+    
+    def get_coordinates(self):
+        """
+        Returns a pandas DataFrame with the coordinates of each PDBchain in the Clans file.
+        """
+        df_coords = pd.DataFrame(self.coordinates, columns=["PDBchain1", "x", "y", "z"])
+        df_coords[["x", "y", "z"]] = df_coords[["x", "y", "z"]].apply(pd.to_numeric, errors="coerce")
+        df_coords = df_coords.apply(pd.to_numeric, errors='coerce')
+        return df_coords
 
 
     @classmethod
