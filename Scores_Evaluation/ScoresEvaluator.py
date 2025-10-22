@@ -1,11 +1,12 @@
 import os
 from Dataset_Generator.DatasetGenerator import DatasetGenerator
 from old_clans.utils_old_clans import run_clans_headless
-from fasta2PDB import *
+from utils_for_PDB import *
 from StructSimComputer import StructSimComputer
 from ClansFileGenerator import ClansFileGenerator
 from ClansFile import ClansFile
 from ToolType import ToolType
+from InputFileType import InputFileType
 import pandas as pd 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -437,7 +438,7 @@ class ScoresEvaluator:
             pdb_dir_for_dataset = os.path.join(out_dir, f"dataset_{i+1}")
             delete_dir_content(pdb_dir_for_dataset)
             print(f"Downloading PDB files for dataset dataset_{i+1}...")
-            fetch_pdbs(dataset_path, pdb_dir_for_dataset)
+            fetch_pdbs(dataset_path, InputFileType.FASTA, pdb_dir_for_dataset)
     
     
     def _generate_datasets(self, n, size, seeds):

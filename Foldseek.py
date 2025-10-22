@@ -1,5 +1,5 @@
 from StructSimTool import StructSimTool
-from fasta2PDB import delete_dir_content
+from utils_for_PDB import delete_dir_content
 import subprocess
 import os
 import pandas as pd

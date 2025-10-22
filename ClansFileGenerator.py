@@ -1,6 +1,6 @@
 from ClansFile import ClansFile
 import os
-from fasta2PDB import extract_uids_from_fasta, delete_dir_content
+from utils_for_PDB import extract_uids_from_fasta, delete_dir_content
 import numpy as np
 
 

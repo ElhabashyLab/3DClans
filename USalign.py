@@ -2,7 +2,7 @@ from StructSimTool import StructSimTool
 import os
 import pandas as pd
 from io import StringIO
-from fasta2PDB import delete_dir_content
+from utils_for_PDB import delete_dir_content
 
 
 class USalign(StructSimTool):

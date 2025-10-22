@@ -1,8 +1,9 @@
 import time
 import os
-from fasta2PDB import fetch_pdbs
+from utils_for_PDB import fetch_pdbs
 from StructSimComputer import StructSimComputer
 from ToolType import ToolType
+from InputFileType import InputFileType
 
 """
 In this file the performance of different alignment tools of protein structures is benchmarked:
@@ -39,7 +40,7 @@ class Benchmark:
                 print("Please provide a fasta file for initial test.")
             else:
                 print(f"Setting up benchmark environment with {fasta_file}...")
-                fetch_pdbs(fasta_file, "PDBs_for_benchmark")
+                fetch_pdbs(fasta_file, InputFileType.FASTA, "PDBs_for_benchmark")
                 self.data = "PDBs_for_benchmark"
                 end = time.time()
                 print(f"Benchmark environment setup complete after {end - start:.4f} seconds. PDB files downloaded to './PDBs_for_benchmark'.")
