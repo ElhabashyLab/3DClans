@@ -178,7 +178,9 @@ class ClansFile:
     def _add_fasta_to_content(self, content):
         content.append("<seq>")
         for record in self.fasta_records:
-            content.append(f">{record.id}\n{record.seq}")
+            header = f">{record.description}"
+            sequence = str(record.seq)
+            content.append(f"{header}\n{sequence}")
         content.append("</seq>")
         return content
     

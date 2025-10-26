@@ -29,7 +29,8 @@ def _save_file(file_path: str, input_file_type: InputFileType) -> str:
         raise IOError
     
     os.makedirs('input_file_storage', exist_ok=True)
-    output_filename = f"input_file.{input_file_type.value}"
+    input_file_name = os.path.basename(file_path).split(".")[0]
+    output_filename = f"{input_file_name}.{input_file_type.value}"
     path_to_stored_file = os.path.join('input_file_storage', output_filename)
     
     try:
@@ -108,15 +109,34 @@ def _create_clans_file(saved_input_file, input_file_type, selected_tool, foldsee
     Returns:
         str: Path to generated clans file.
     """
-    cleaned_input_file = fetch_pdbs(saved_input_file, input_file_type, "PDBs")
+    uids_with_regions = fetch_pdbs(saved_input_file, input_file_type, "PDBs")
+    input_file_name = os.path.basename(saved_input_file).split(".")[0]
+    input_file_dir = os.path.dirname(saved_input_file)
+    cleaned_input_file_path = os.path.join(input_file_dir, f"{input_file_name}_cleaned.fasta")
+    if input_file_type == InputFileType.FASTA:
+        generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path, saved_input_file)
+    else:
+        generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path)
     scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
     scores = scores_computer.run(selected_tool, "PDBs")
     clans_generator = ClansFileGenerator()
-    clans_file_path = clans_generator.generate_clans_file(scores, cleaned_input_file)
+    clans_file_path = clans_generator.generate_clans_file(scores, cleaned_input_file_path)
     return clans_file_path
     
 
 def _set_up_scores_computer(selected_tool, foldseek_score):
+    """Creates an instance of a StructSimComputer with the given selected_tool, and a possible foldseekscore.
+    
+    Args:
+        selected_tool (ToolType): The ToolType used by the StructSimComputer
+        foldseek_score (str): The foldseek_score used by the StrucSimComputer. Is None if selected_tool is not foldseek
+
+    Raises:
+        ValueError: Is raised if a foldseek_score is specified but foldseek not selected_tool
+
+    Returns:
+        StructSimComputer: The instance of the StructSimComputer
+    """
     if selected_tool == ToolType.FOLDSEEK:
         if foldseek_score == None or foldseek_score == "evalue":
             return StructSimComputer()

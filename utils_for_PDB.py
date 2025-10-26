@@ -1,4 +1,7 @@
-from Bio import SeqIO
+import re
+from Bio import SeqIO, Entrez
+import Bio.PDB as bpdb
+Entrez.email = "aron.wichtner@tuebingen.mpg.de"
 import requests
 import os
 import shutil
@@ -79,11 +82,39 @@ def extract_uid_from_recordID(record_id):
     return uid
 
 
-def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> str:
+def extract_region_from_record(record) -> list | None:
+    """
+    Extracts the numeric region of interest (start and end) from a FASTA record header.
+
+    Example header:
+        >Y1502_ARCFU/1-68
+        >tr|A0A819D2C1|A0A819D2C1_9BILA/1286-1334
+
+    This function extracts the region "1-68" or "1286-1334" and returns [start, end] as integers.
+
+    Args:
+        record (SeqRecord): A Biopython SeqRecord object representing a FASTA entry.
+
+    Returns:
+        list[int, int] | None: A list [region_start, region_end] if a valid region is found,
+                               otherwise None.
+    """
+    # Extract the record header (identifier)
+    header = record.id
+    # Search for a region pattern like "/123-456"
+    match = re.search(r"/(\d+)-(\d+)", header)
+    if match:
+        start, end = map(int, match.groups())
+        return [start, end]
+    else:
+        return None
+
+
+def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict:
     """
     Fetches and stores PDB files, specified in a given input_file in a output directory.
     The contents of the output dir will be overwritten.
-    It also returns a cleaned input_file containing only the sequences that have been successfully downloaded and saves it in the same dir as the given input_file.
+    It returns a dict containing uid : [region_start, region_end] of the sequences that have been successfully downloaded.
     
     Args:
         input_file_path: Path to the input file.
@@ -91,57 +122,167 @@ def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir:
         output_dir: The directory where the downloaded PDBs are stored.
         
     Returns:
-        cleaned_input_file_path: Path to cleaned version of the input_file containing only successfully downloaded elements.
+        dict: Path to cleaned version of the input_file containing only successfully downloaded elements.
     """    
-    input_file_name = os.path.basename(input_file_path).split(".")[0]
-    input_file_dir = os.path.dirname(input_file_path)
-    cleaned_input_file_path = os.path.join(input_file_dir, f"{input_file_name}_cleaned.{input_file_type.value}")
-    delete_dir_content(output_dir)    
-    # Process based on file type
+    delete_dir_content(output_dir)
     if input_file_type is InputFileType.FASTA:
-        return _process_fasta_file(input_file_path, cleaned_input_file_path, output_dir)
+        return process_fasta_file(input_file_path, output_dir)
     elif input_file_type is InputFileType.TSV:
-        return _process_tsv_file(input_file_path, cleaned_input_file_path, output_dir)
+        return process_tsv_file(input_file_path, output_dir)
     else:
         raise ValueError(f"Unsupported input file type: {input_file_type}")
+    
 
+def process_fasta_file(input_file_path: str, output_dir: str) -> dict:
+    """
+    Downloads the PDBs of the sequences in the given fasta_file.
+    It also creates a dictionary with an entry for each downloaded record: {uid : region}
+    The region can be None if not specified in the header of the fasta records.
 
-def _process_fasta_file(input_file_path: str, cleaned_file_path: str, output_dir: str) -> str:
-    """Process FASTA file and download corresponding PDB files."""
+    Args:
+        input_file_path (str): Path to fasta file.
+        output_dir (str): Directory in which to save the downloaded PDBs.
+
+    Returns:
+        dict: Containing downloaded uids together with their regions.
+    """
     successful_downloads = 0
     total_records = 0
-    with open(cleaned_file_path, 'w') as cleaned_file:
-        for record in SeqIO.parse(input_file_path, "fasta"):
-            total_records += 1
-            uid = extract_uid_from_recordID(record.id)
-            if _download_alphafold_structure(uid, output_dir):
-                SeqIO.write(record, cleaned_file, "fasta")
-                successful_downloads += 1
+    uids_with_regions = {}
+    for record in SeqIO.parse(input_file_path, "fasta"):
+        total_records += 1
+        uid = extract_uid_from_recordID(record.id)
+        region = extract_region_from_record(record)
+        if download_alphafold_structure(uid, output_dir, region):
+            uids_with_regions[uid] = region
+            successful_downloads += 1
     print(f"Downloaded {successful_downloads} from {total_records} PDB files successfully.")
-    return cleaned_file_path
+    return uids_with_regions
 
 
-def _process_tsv_file(input_file_path: str, cleaned_file_path: str, output_dir: str) -> str:
-    """Process tsv file and download corresponding PDB files."""
+def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
+    """
+    Downloads the PDBs of the uids in the given tsv file.
+    It also creates a dictionary with an entry for each downloaded record. uid : [region]
+    The tsv file should contain the columns [entry, region_start, region_end].
+
+    Args:
+        input_file_path (str): Path to tsv file.
+        output_dir (str): Directory in which to save the downloaded PDBs.
+
+    Returns:
+        dict: Containing downloaded records together with their regions.
+    """
     df = pd.read_csv(input_file_path, sep='\t')
     successful_downloads = 0
+    uids_with_regions = {}
     total_uids = len(df)
-    def download_and_check(row):
-        nonlocal successful_downloads
-        uid = row['uid']
-        if _download_alphafold_structure(uid, output_dir):
+    for _, row in df.iterrows():
+        uid = row['entry']
+        start: int = row['region_start']
+        end: int = row['region_end']
+        if pd.isna(start) or pd.isna(end):
+            region = None
+        else:
+            region = [start, end]
+        if download_alphafold_structure(uid, output_dir, region):
             successful_downloads += 1
-            return True
-        return False
-    successful_mask = df.apply(download_and_check, axis=1)
-    successful_df = df[successful_mask]
-    successful_df.to_csv(cleaned_file_path, sep='\t', index=False)
+            uids_with_regions[uid] = region
     print(f"Downloaded {successful_downloads} from {total_uids} PDB files successfully.")
-    return cleaned_file_path
+    return uids_with_regions
 
 
-def _download_alphafold_structure(uid: str, output_dir: str) -> bool:
-    """Download AlphaFold structure for a given UID."""
-    url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v6.pdb" # This url might change over time depending on model
-    output_path = os.path.join(output_dir, f"{uid}.pdb")
-    return download_file(url, output_path)
+def download_alphafold_structure(uid: str, output_dir: str, region: list[int] | None, file_format: str = "pdb") -> bool:
+    """
+    Downloads the AlphaFold structure of a given protein and saves it in the output_dir.
+    If region is provided, the protein is cut to the specified region.
+
+    Args:
+        uid (str): Protein UniProt ID.
+        output_dir (str): Directory to save the file.
+        region (list[int] | None): Residue range [start, end].
+        file_format (str): 'pdb' or 'cif'.
+    Returns:
+        bool: True if download succeeded.
+    """
+    url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v6.{file_format}" # This url might change over time depending on model
+    output_path = os.path.join(output_dir, f"{uid}.{file_format}")
+    success = download_file(url, output_path)
+    if success and region:
+        ...
+    return success
+
+
+class ResidueSelect(Select):
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+    def accept_residue(self, residue):
+        res_id = residue.get_id()[1]  # residue number
+        return self.start <= res_id <= self.end
+
+
+def extract_region_of_protein(path_to_protein: str, file_type: str, region: list[int]):
+    """
+    Cuts the protein to a desired start and end Aminoacid as specifies in region.
+    The protein can be of file type PDB or cif.
+
+    Args:
+        path_to_protein (str): Path to the file of the protein to be cut.
+        file_type (str): 'pdb' or 'cif'
+        region (list[int]): Residue range [start, end]
+    """
+    file_name 
+    parser = PDBParser()
+    structure = parser.get_structure("AF", f"{uniprot_id}.pdb")
+
+    io = PDBIO()
+    io.set_structure(structure)
+    io.save(f"{uniprot_id}_region.pdb", ResidueSelect(10, 30))  # residues 10-30
+    
+
+
+def download_fasta_record(uid: str):
+    """
+    Download protein fasta record with given uid
+    
+    Args: 
+        uid (str): Protein uid.
+    Returns:
+        SeqRecord: downloaded record.
+    """
+    with Entrez.efetch(db="protein", id=uid, rettype="fasta", retmode="text") as handle:
+        record = SeqIO.read(handle, "fasta")
+    return record
+        
+
+def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str, original_fasta=None):
+    """
+    Generates a FASTA file containing the sequences (cut down to their corresponding regions) of the given UIDs.
+    The records will include the UID and region (if present) in the header.
+    
+    If original_fasta is provided, the method will extract sequences from it which are also part of the uids_with_regions.
+    Otherwise the fasta file is generated from scratch and the Record IDs are of the format: UID or UID/start-end.
+
+    Args:
+        uids_with_regions (dict): Mapping {uid: [region_start, region_end] or None}.
+        out_path (str): Path to the output FASTA file.
+        original_fasta (str, optional): Path to an existing FASTA file with sequences.
+    """
+    records = []
+
+    # generate fasta with original fasta records
+    if original_fasta is not None:
+        original_records = list(SeqIO.parse(original_fasta, "fasta"))
+        for uid, region in uids_with_regions.items():
+            for record in original_records:
+                if uid in record.id:
+                    records.append(record)
+    # generate fasta from scratch
+    else:
+        for uid, region in uids_with_regions.items():
+            record = download_fasta_record(uid)
+            records.append(record)
+    # write records to fasta file
+    SeqIO.write(records, out_path, "fasta")
+    
