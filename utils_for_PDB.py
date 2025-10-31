@@ -1,7 +1,10 @@
+from io import StringIO
 import re
-from Bio import SeqIO, Entrez
-import Bio.PDB as bpdb
-Entrez.email = "aron.wichtner@tuebingen.mpg.de"
+from Bio import SeqIO
+from Bio.PDB.PDBIO import PDBIO
+from Bio.PDB.PDBParser import PDBParser
+from Bio.PDB.MMCIFParser import MMCIFParser
+from Bio.PDB.PDBIO import Select
 import requests
 import os
 import shutil
@@ -114,7 +117,7 @@ def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir:
     """
     Fetches and stores PDB files, specified in a given input_file in a output directory.
     The contents of the output dir will be overwritten.
-    It returns a dict containing uid : [region_start, region_end] of the sequences that have been successfully downloaded.
+    It returns a dict containing {uid : [region_start, region_end]} of the sequences that have been successfully downloaded.
     
     Args:
         input_file_path: Path to the input file.
@@ -209,52 +212,62 @@ def download_alphafold_structure(uid: str, output_dir: str, region: list[int] | 
     output_path = os.path.join(output_dir, f"{uid}.{file_format}")
     success = download_file(url, output_path)
     if success and region:
-        ...
+        extract_region_of_protein(output_path, file_format, region)
     return success
-
-
-class ResidueSelect(Select):
-    def __init__(self, start, end):
-        self.start = start
-        self.end = end
-    def accept_residue(self, residue):
-        res_id = residue.get_id()[1]  # residue number
-        return self.start <= res_id <= self.end
 
 
 def extract_region_of_protein(path_to_protein: str, file_type: str, region: list[int]):
     """
-    Cuts the protein to a desired start and end Aminoacid as specifies in region.
-    The protein can be of file type PDB or cif.
-
+    Extracts a specific residue range from a protein structure file (PDB or CIF).
+    And overwrites the original file with the extracted region.
+    
     Args:
-        path_to_protein (str): Path to the file of the protein to be cut.
-        file_type (str): 'pdb' or 'cif'
-        region (list[int]): Residue range [start, end]
+        path_to_protein (str): Path to the protein file.
+        file_type (str): 'pdb' or 'cif'.
+        region (list[int]): [start, end] residue indices to extract.
     """
-    file_name 
-    parser = PDBParser()
-    structure = parser.get_structure("AF", f"{uniprot_id}.pdb")
-
+    class SelectRegion(Select):
+        def accept_residue(self, residue):
+            return region[0] <= residue.id[1] <= region[1]
+        
+    if file_type == "pdb":
+        parser = PDBParser(QUIET=True)
+    else:
+        parser = MMCIFParser(QUIET=True)
+    structure = parser.get_structure("protein", path_to_protein)
     io = PDBIO()
     io.set_structure(structure)
-    io.save(f"{uniprot_id}_region.pdb", ResidueSelect(10, 30))  # residues 10-30
-    
+    io.save(path_to_protein, select=SelectRegion())
 
 
-def download_fasta_record(uid: str):
+def download_fasta_record_from_uniprot(uid: str):
     """
-    Download protein fasta record with given uid
-    
-    Args: 
-        uid (str): Protein uid.
+    Download a UniProt FASTA record by accession.
+
+    Args:
+        uid (str): UniProt accession.
     Returns:
-        SeqRecord: downloaded record.
+        SeqRecord: downloaded FASTA record.
+        bool: False if download failed.
     """
-    with Entrez.efetch(db="protein", id=uid, rettype="fasta", retmode="text") as handle:
-        record = SeqIO.read(handle, "fasta")
+    url = f"https://rest.uniprot.org/uniprotkb/{uid}.fasta?format=fasta"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        print(f"Failed to fetch {uid}: {response.status_code} ({response.reason})")
+        return False
+    handle = StringIO(response.text)
+    # check if handle contains a valid fasta record
+    if not handle.getvalue().startswith(">"):
+        # try uniparc api
+        url_uniparc = f"https://rest.uniprot.org/uniparc/{uid}.fasta?format=fasta"
+        response_uniparc = requests.get(url_uniparc)
+        if response_uniparc.status_code != 200:
+            print(f"Failed to fetch {uid} from UniParc: {response_uniparc.status_code} ({response_uniparc.reason})")
+            return False
+    record = SeqIO.read(handle, "fasta")
     return record
-        
+
 
 def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str, original_fasta=None):
     """
@@ -270,7 +283,6 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
         original_fasta (str, optional): Path to an existing FASTA file with sequences.
     """
     records = []
-
     # generate fasta with original fasta records
     if original_fasta is not None:
         original_records = list(SeqIO.parse(original_fasta, "fasta"))
@@ -281,8 +293,12 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
     # generate fasta from scratch
     else:
         for uid, region in uids_with_regions.items():
-            record = download_fasta_record(uid)
+            record = download_fasta_record_from_uniprot(uid)
+            if record is False:
+                continue
+            if region:
+                record.id = f"{uid}/{region[0]}-{region[1]}"
+                record.description = ""
             records.append(record)
-    # write records to fasta file
     SeqIO.write(records, out_path, "fasta")
     
