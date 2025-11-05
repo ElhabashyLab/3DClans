@@ -69,9 +69,9 @@ class ClansFileGenerator:
             0     2      0.7
             1     2      0.6
         3. Drops duplicate lines (f.e. 0 1 0.8 and 1 0 0.8).
-        
-        (Duplicate lines should not be in the scores becauese the scores can still be different for PDBchain1 with PDBchain2
-        and PDBchain2 with PDBchain1!))
+
+        (Duplicate lines should not be in the scores because the scores can still be different for PDBchain1 with PDBchain2
+        and PDBchain2 with PDBchain1.)
         
         example:
         

@@ -1,6 +1,8 @@
 from io import StringIO
 import re
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 from Bio.PDB.PDBIO import PDBIO
 from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.MMCIFParser import MMCIFParser
@@ -17,10 +19,10 @@ def download_file(url, output_path):
     Downloads a file from a given URL and saves it to a specified local path.
     """
     try:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         response = requests.get(url, stream=True, timeout=10)
         # raise exception if request failed
         response.raise_for_status()
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, 'wb') as f:
             # download file in 8KB chunks
             for chunk in response.iter_content(chunk_size=8192):
@@ -240,9 +242,9 @@ def extract_region_of_protein(path_to_protein: str, file_type: str, region: list
     io.save(path_to_protein, select=SelectRegion())
 
 
-def download_fasta_record_from_uniprot(uid: str):
+def download_fasta_record(uid: str) -> SeqRecord | bool:
     """
-    Download a UniProt FASTA record by accession.
+    Download a UniProt FASTA record by accession. If it is not available, try UniParc.
 
     Args:
         uid (str): UniProt accession.
@@ -250,23 +252,19 @@ def download_fasta_record_from_uniprot(uid: str):
         SeqRecord: downloaded FASTA record.
         bool: False if download failed.
     """
-    url = f"https://rest.uniprot.org/uniprotkb/{uid}.fasta?format=fasta"
-    response = requests.get(url)
-
-    if response.status_code != 200:
-        print(f"Failed to fetch {uid}: {response.status_code} ({response.reason})")
-        return False
-    handle = StringIO(response.text)
-    # check if handle contains a valid fasta record
-    if not handle.getvalue().startswith(">"):
-        # try uniparc api
-        url_uniparc = f"https://rest.uniprot.org/uniparc/{uid}.fasta?format=fasta"
-        response_uniparc = requests.get(url_uniparc)
-        if response_uniparc.status_code != 200:
-            print(f"Failed to fetch {uid} from UniParc: {response_uniparc.status_code} ({response_uniparc.reason})")
-            return False
-    record = SeqIO.read(handle, "fasta")
-    return record
+    # URLs for UniProt and UniParc
+    uniprot_url = f"https://rest.uniprot.org/uniprotkb/{uid}.fasta"
+    uniparc_url = f"https://rest.uniprot.org/uniparc/{uid}.fasta"
+    for url in [uniprot_url, uniparc_url]:
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200 and response.text.startswith(">"):
+                fasta_io = StringIO(response.text)
+                record = next(SeqIO.parse(fasta_io, "fasta"))
+                return record
+        except Exception as e:
+            continue
+    return False
 
 
 def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str, original_fasta=None):
@@ -293,12 +291,13 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
     # generate fasta from scratch
     else:
         for uid, region in uids_with_regions.items():
-            record = download_fasta_record_from_uniprot(uid)
-            if record is False:
-                continue
-            if region:
-                record.id = f"{uid}/{region[0]}-{region[1]}"
-                record.description = ""
-            records.append(record)
+            downloaded_record = download_fasta_record(uid)
+            if isinstance(downloaded_record, SeqRecord):
+                downloaded_record.id = f"|{uid}|/{region[0]}-{region[1]}"
+                downloaded_record.description = ""
+                records.append(downloaded_record)
+            else:
+                fallback_record = SeqRecord(Seq("not_found"), id=uid, description=f"{region[0]}-{region[1]}")
+                records.append(fallback_record)
     SeqIO.write(records, out_path, "fasta")
     
