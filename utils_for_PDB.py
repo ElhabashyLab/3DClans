@@ -211,35 +211,58 @@ def download_alphafold_structure(uid: str, output_dir: str, region: list[int] | 
         bool: True if download succeeded.
     """
     url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v6.{file_format}" # This url might change over time depending on model
-    output_path = os.path.join(output_dir, f"{uid}.{file_format}")
-    success = download_file(url, output_path)
+    path_to_structure = os.path.join(output_dir, f"{uid}.{file_format}")
+    success = download_file(url, path_to_structure)
     if success and region:
-        extract_region_of_protein(output_path, file_format, region)
+        extract_region_of_protein(path_to_structure, file_format, region)
     return success
+    
 
-
-def extract_region_of_protein(path_to_protein: str, file_type: str, region: list[int]):
+def extract_region_of_protein(path_to_protein: str, file_type: str, region: list[int], output_path = None):
     """
-    Extracts a specific residue range from a protein structure file (PDB or CIF).
-    And overwrites the original file with the extracted region.
+    Extracts a specific residue range from a protein structure file (PDB or CIF)
+    without corrupting metadata. Writes output to a new file by default.
     
     Args:
         path_to_protein (str): Path to the protein file.
         file_type (str): 'pdb' or 'cif'.
         region (list[int]): [start, end] residue indices to extract.
+        output_path (str, optional): Path to save extracted structure. Defaults to adding '_region' suffix.
     """
     class SelectRegion(Select):
         def accept_residue(self, residue):
             return region[0] <= residue.id[1] <= region[1]
-        
-    if file_type == "pdb":
-        parser = PDBParser(QUIET=True)
-    else:
-        parser = MMCIFParser(QUIET=True)
+
+    parser = PDBParser(QUIET=True) if file_type == "pdb" else MMCIFParser(QUIET=True)
     structure = parser.get_structure("protein", path_to_protein)
-    io = PDBIO()
-    io.set_structure(structure)
-    io.save(path_to_protein, select=SelectRegion())
+    if output_path is None:
+        root, ext = os.path.splitext(path_to_protein)
+        output_path = f"{root}_roi{ext}"
+    meta_data = get_meta_data_of_structure_file(path_to_protein)
+    with open(output_path, "w") as out:
+        out.writelines(meta_data)
+        io = PDBIO()
+        io.set_structure(structure)
+        io.save(out, select=SelectRegion())
+    return output_path
+
+
+def get_meta_data_of_structure_file(path_to_protein: str) -> list[str]:
+    """
+    Extracts the meta data from a PDB or CIF structure file. This includes header lines before the ATOM/HETATM lines.
+    
+    Args:
+        path_to_protein (str): Path to the protein file.
+        file_type (str): 'pdb' or 'cif'.
+    """
+    with open(path_to_protein, "r") as f:
+        lines = f.readlines()
+        header_lines = []
+        for line in lines:
+            if line.startswith(("ATOM", "HETATM", "MODEL")):
+                break
+            header_lines.append(line)
+    return header_lines
 
 
 def download_fasta_record(uid: str) -> SeqRecord | bool:
@@ -292,12 +315,15 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
     else:
         for uid, region in uids_with_regions.items():
             downloaded_record = download_fasta_record(uid)
+            if region is None:
+                region_str = ""
+            else:
+                region_str = f"/{int(region[0])}-{int(region[1])}"
             if isinstance(downloaded_record, SeqRecord):
-                downloaded_record.id = f"|{uid}|/{region[0]}-{region[1]}"
-                downloaded_record.description = ""
+                downloaded_record.id = f"{downloaded_record.id}{region_str}"
                 records.append(downloaded_record)
             else:
-                fallback_record = SeqRecord(Seq("not_found"), id=uid, description=f"{region[0]}-{region[1]}")
+                fallback_record = SeqRecord(Seq("not_found"), id=f"|{uid}|{region_str}", description="")
                 records.append(fallback_record)
     SeqIO.write(records, out_path, "fasta")
     
