@@ -75,7 +75,7 @@ def _set_up_parser() -> argparse.ArgumentParser:
         "-s", "--score",
         required=False,
         choices=["evalue", "TM"],
-        default="evalue",
+        default=None,
         help="specifies the scoring method to use for Foldseek (default: evalue)",
     )
     return parser
@@ -93,7 +93,7 @@ def main():
     selected_tool = ToolType(args.tool)
     foldseek_score = args.score
     saved_input_file = _save_file(path_to_input_file, input_file_type)
-    clans_file = _create_clans_file(saved_input_file, input_file_type, selected_tool, foldseek_score)
+    clans_file_path = _create_clans_file(saved_input_file, input_file_type, selected_tool, foldseek_score)
             
 
 def _create_clans_file(saved_input_file, input_file_type, selected_tool, foldseek_score):

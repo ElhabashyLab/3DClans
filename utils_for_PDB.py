@@ -214,7 +214,7 @@ def download_alphafold_structure(uid: str, output_dir: str, region: list[int] | 
     path_to_structure = os.path.join(output_dir, f"{uid}.{file_format}")
     success = download_file(url, path_to_structure)
     if success and region:
-        extract_region_of_protein(path_to_structure, file_format, region)
+        extract_region_of_protein(path_to_structure, file_format, region, path_to_structure) # overwrites path_to_structure
     return success
     
 
@@ -239,12 +239,72 @@ def extract_region_of_protein(path_to_protein: str, file_type: str, region: list
         root, ext = os.path.splitext(path_to_protein)
         output_path = f"{root}_roi{ext}"
     meta_data = get_meta_data_of_structure_file(path_to_protein)
+    meta_data_corrected = adapt_metadata_to_region(meta_data, region)
     with open(output_path, "w") as out:
-        out.writelines(meta_data)
+        # out.writelines(meta_data_corrected)
         io = PDBIO()
         io.set_structure(structure)
         io.save(out, select=SelectRegion())
     return output_path
+
+
+def adapt_metadata_to_region(meta_data: list[str], region: list[int]) -> list[str]:
+    """
+    Adapts the metadata lines of a structure file to reflect the extracted region.
+    
+    Args:
+        meta_data (list[str]): Original metadata lines.
+        region (list[int]): [start, end] residue indices.
+        
+    Returns:
+        list[str]: Adapted metadata lines.
+    """
+    adapted_lines = []
+    for line in meta_data:
+        if line.startswith("DBREF"):
+            adapted_line = handle_DBREF_line(line, region)
+            adapted_lines.append(adapted_line)
+        elif line.startswith("SEQRES"):
+            parts = line.split()
+            num_residues_region = region[1] - region[0] + 1
+            parts[3] = str(num_residues_region)  # update number of residues
+            adapted_line = " ".join(parts) + "\n"
+            adapted_lines.append(adapted_line)
+            # Note: Further adjustments to 3-letter code listing is not done yet.
+        else:
+            adapted_lines.append(line)
+    return adapted_lines
+
+
+def handle_DBREF_line(line: str, region: list[int]) -> str:
+    """
+    Adapts a DBREF line to reflect the extracted region.
+    
+    Args:
+        line (str): Original DBREF line.
+        region (list[int]): [start, end] residue indices.
+        
+    Returns:
+        str: Adapted DBREF line.
+    """
+    region_start = region[0]
+    region_end = region[1]
+    parts = line.split()
+    parts = line.split()
+    pdb_start = int(parts[3])
+    pdb_end = int(parts[4])
+    uniprot_start = int(parts[8])
+    uniprot_end = int(parts[9])
+    offset_start = pdb_start - uniprot_start
+    offset_end = pdb_end - uniprot_end
+    uniprot_start_corrected = region_start - offset_start
+    uniprot_end_corrected = region_end - offset_end
+    parts[3] = str(region_start) # new pdb start reflects region start
+    parts[4] = str(region_end) # new pdb end reflects region end
+    parts[8] = str(uniprot_start_corrected) # new uniprot start reflects region start (corrected by possible offset)
+    parts[9] = str(uniprot_end_corrected) # new uniprot end reflects region end (corrected by possible offset)
+    adapted_line = " ".join(parts) + "\n"
+    return adapted_line
 
 
 def get_meta_data_of_structure_file(path_to_protein: str) -> list[str]:
@@ -254,6 +314,8 @@ def get_meta_data_of_structure_file(path_to_protein: str) -> list[str]:
     Args:
         path_to_protein (str): Path to the protein file.
         file_type (str): 'pdb' or 'cif'.
+    Returns:
+        list[str]: List of meta data lines.
     """
     with open(path_to_protein, "r") as f:
         lines = f.readlines()
@@ -303,27 +365,81 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
         out_path (str): Path to the output FASTA file.
         original_fasta (str, optional): Path to an existing FASTA file with sequences.
     """
-    records = []
     # generate fasta with original fasta records
     if original_fasta is not None:
-        original_records = list(SeqIO.parse(original_fasta, "fasta"))
-        for uid, region in uids_with_regions.items():
-            for record in original_records:
-                if uid in record.id:
-                    records.append(record)
-    # generate fasta from scratch
+        uids = list(uids_with_regions.keys())
+        copy_records_from_fasta(original_fasta, uids, out_path)
+    # generate fasta with possible regions from scratch
     else:
+        records = []
         for uid, region in uids_with_regions.items():
             downloaded_record = download_fasta_record(uid)
-            if region is None:
-                region_str = ""
-            else:
-                region_str = f"/{int(region[0])}-{int(region[1])}"
             if isinstance(downloaded_record, SeqRecord):
-                downloaded_record.id = f"{downloaded_record.id}{region_str}"
-                records.append(downloaded_record)
+                record_with_region = add_region_to_record(downloaded_record, region)
+                records.append(record_with_region)
             else:
-                fallback_record = SeqRecord(Seq("not_found"), id=f"|{uid}|{region_str}", description="")
+                fallback_record = create_mok_up_record(uid, region)
                 records.append(fallback_record)
+        SeqIO.write(records, out_path, "fasta")
+
+
+def create_mok_up_record(uid: str, region: list[int] | None) -> SeqRecord:
+    """
+    Creates a mock-up SeqRecord for a given UID and region.
+
+    Args:
+        uid (str): The UniProt ID.
+        region (list[int] | None): The region to include in the ID.
+
+    Returns:
+        SeqRecord: The created mock-up record.
+    """
+    if region is None:
+        region_str = ""
+    else:
+        region_str = f"/{int(region[0])}-{int(region[1])}"
+    record_id = f"|{uid}|{region_str}"
+    record = SeqRecord(Seq("not_found"), id=record_id, description="")
+    return record
+
+
+def add_region_to_record(record: SeqRecord, region: list[int] | None) -> SeqRecord:
+    """
+    Takes a SeqRecord and modifies its ID to include the region if provided.
+
+    Args:
+        record (SeqRecord): The record to modify.
+        region (list[int] | None): The region to include in the ID.
+
+    Returns:
+        SeqRecord: The modified record.
+    """
+    if region is None:
+        region_str = ""
+    else:
+        region_str = f"/{int(region[0])}-{int(region[1])}"
+    record.id = f"{record.id}{region_str}"
+    record.description = ""
+    return record
+
+
+def copy_records_from_fasta(path_to_fasta: str, uids: list, out_path: str) -> str:
+    """
+    Copies the records with the given uids from the fasta file to a new fasta file.
+    Args:
+        path_to_fasta (str): Path to the input FASTA file.
+        uids (list): List with UIDs to copy.
+        out_path (str): Path to the output FASTA file.
+
+    Returns:
+        str: Path to the output FASTA file.
+    """
+    original_records = list(SeqIO.parse(path_to_fasta, "fasta"))
+    records = []
+    for uid in uids:
+        for record in original_records:
+            if uid in record.id:
+                records.append(record)
     SeqIO.write(records, out_path, "fasta")
+    return out_path
     
