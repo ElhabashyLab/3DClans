@@ -1,5 +1,5 @@
 from StructSimTool import StructSimTool
-from utils_for_PDB import delete_dir_content
+from utils_for_PDB import reset_dir_content
 import subprocess
 import os
 import pandas as pd
@@ -13,7 +13,7 @@ class Foldseek(StructSimTool):
         description = "A tool for protein structure comparison using Foldseek."
         self.score = score
         if os.path.exists("Foldseek_working_dir"):
-            delete_dir_content("Foldseek_working_dir")
+            reset_dir_content("Foldseek_working_dir")
         else:
             os.makedirs("Foldseek_working_dir")
         working_dir = "Foldseek_working_dir/"

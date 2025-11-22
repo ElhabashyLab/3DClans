@@ -1,4 +1,6 @@
+import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # to import from parent dir
 from Dataset_Generator.DatasetGenerator import DatasetGenerator
 from old_clans.utils_old_clans import run_clans_headless
 from utils_for_PDB import *
@@ -12,63 +14,72 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import networkx as nx
+from typing import Optional
 
 
 class ScoresEvaluator:
     """
     This class is responsible for evaluating the structure similarity scores by comparing them to sequence similarity scores.
-    The datasets used for the evaluation are generated with the DatasetGenerator class with the given seeds.
-    With the generated data, the structure similarity scores and sequence similarity scores are computed and clans files anre generated.
+    The datasets used for the evaluation can be generated with the DatasetGenerator class with the given seeds.
+    Otherwise the user can provide existing datasets.
+    With the data, the structure similarity scores and sequence similarity scores are computed and clans files are generated for each.
     The comparison is done with the scores as well as with inferred graphs and clusters.
+    
+    Order of method calls for evaluation:
+    1. __init__: Initialize the ScoresEvaluator with necessary parameters.
+    2. _initialize_evaluation: provide or generate the data, compute scores, and generate clans files.
+    3. evaluate: Perform the evaluation on the generated clans files and return the results.
+    4. _display_evaluation_results: Display the evaluation results including plots and dataframes
     """
-    def __init__(self, number_of_datasets, size_of_datasets, seeds, path_to_recovered_clans: str, rounds_to_cluster: int):
-        self._check_for_correct_input(number_of_datasets, seeds)
-        self.size_of_datasets = size_of_datasets
-        self.working_dir = os.path.dirname(os.path.abspath("evaluation_utils.py"))
+    def __init__(self, path_to_recovered_clans: str):
+        """
+        Innitializes the ScoresEvaluator by setting up necessary directories and creating instances of required classes.
+
+        Args:
+        path_to_recovered_clans (str): Path to the recovered clans.jar file.
+        rounds_to_cluster (int): Number of rounds to use for clustering in recovered clans.
+        generate_datasets (bool): Whether to generate datasets or use existing data.
+        data_for_datasets (list): A list containing number_of_datasets (int), size_of_datasets (int) and seeds (list of str) for dataset generation.
+        """
+        self.working_dir = os.path.dirname(os.path.abspath("ScoresEvaluator.py"))
         self._set_up_dirs()
-        self.dataset_generator = DatasetGenerator(self.generated_datasets_dir) 
+        self.dataset_generator = DatasetGenerator(self.datasets_dir)
         self.scores_computer = StructSimComputer()
         self.tool_type = ToolType.FOLDSEEK
         self.struct_clans_generator = ClansFileGenerator(self.clans_files_structsim_dir)
         self.seq_clans_generator = ClansFileGenerator(self.clans_files_seqsim_dir) 
         self.path_to_recovered_clans = path_to_recovered_clans
-        self.rounds_to_cluster = rounds_to_cluster
-        
-        
-    def _set_up_dirs(self):
-        """
-        Sets up the necessary directories for the evaluation.
-        Creates directories for generated datasets, pdbs, clans files and blast files.
-        Deletes the content of the directories if they already exist.
-        """
-        abs_path_working_dir = os.path.abspath(self.working_dir)
-        self.generated_datasets_dir = f"{abs_path_working_dir}/generated_datasets"
-        self.pdbs_dir = f"{abs_path_working_dir}/PDBs"
-        self.clans_files_structsim_dir = f"{abs_path_working_dir}/clans_files_structsim" # dir for clans files generated with structure similarity scores
-        self.clans_files_seqsim_dir = f"{abs_path_working_dir}/clans_files_seqsim" # dir for clans files generated with sequence similarity scores
-        self.blast_dir = f"{abs_path_working_dir}/blast_files"
-        for dir_path in [self.generated_datasets_dir, self.pdbs_dir, self.clans_files_structsim_dir, self.blast_dir, self.clans_files_seqsim_dir]:
-            delete_dir_content(dir_path)
 
 
-    def _initialize_evaluation(self):
+    def initialize_evaluation(self, rounds_to_cluster: int, datasets_meta_data: dict, use_existing_dataset: bool = False, path_to_dir_of_existing_datasets: Optional[str] = None) -> dict:
         """
-        Generates datasets (fasta_files), downloads the corresponding PDB files, computes structure similarity scores and creates clans files from those.
-        After it runs the old recovered clans on the generated clans files and saves the updated clans files.
-        This function should be called before running the actual evaluation if no data is already provided.
+        Generates or uses existing datasets.
+        Downloads the corresponding PDB files of the datasets, computes structure similarity scores and creates clans files from those.
+        After, it runs the old recovered clans 'rounds_to_cluster'-times on the generated clans files and saves the updated clans files.
+        This function should be called before running the actual evaluation.
+        Args:
+            rounds_to_cluster: Number of rounds to use for clustering in recovered clans.
+            datasets_meta_data: A dictionary containing for each dataset; size_of_dataset (int), number of clusters (int) and seeds (list of str).
+            use_existing_dataset: Whether to use existing datasets or generate new ones.
+            path_to_dir_of_existing_datasets: Path to existing datasets if use_existing_dataset is True.
+        Retruns:
+            dict: A dictionary mapping structural clans file paths to sequence clans file paths.
         """
         print("Initializing evaluation...")
-        self._generate_datasets(self.number_of_datasets, self.size_of_datasets, self.seeds)
-        self._download_pdbs(self.generated_datasets_dir, self.pdbs_dir)
-        scores_for_each_dataset = self._compute_scores(self.pdbs_dir, self.number_of_datasets)
-        self._compute_clans_files(scores_for_each_dataset, self.generated_datasets_dir, self.number_of_datasets)
+        self._set_up_datasets_dir(use_existing_dataset, path_to_dir_of_existing_datasets, datasets_meta_data)
+        uids_with_regions_for_each_dataset = self._download_pdbs(self.datasets_dir, self.structures_dir)  
+        paths_to_cleaned_datasets = self._generate_fasta_from_uids_with_regions_for_each_dataset(uids_with_regions_for_each_dataset, self.datasets_dir)
+        scores_for_each_dataset = self._compute_scores(self.structures_dir)
+        self._compute_clans_files(scores_for_each_dataset, paths_to_cleaned_datasets)
+        # clustering clans files with recovered clans
         print("Running recovered clans.jar on the generated structural clans files...")
         input_output_dict_structural = self._generate_input_output_files_dict(self.clans_files_structsim_dir, self.clans_files_structsim_dir)
-        run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type="clans", rounds=self.rounds_to_cluster)
+        run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type="clans", rounds=rounds_to_cluster)
         print("Running recovered clans.jar with sequences similarity scores...")
-        input_output_dict_sequence = self._generate_input_output_files_dict(self.generated_datasets_dir, self.clans_files_seqsim_dir)
-        run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type="fasta", blast_dir=self.blast_dir, clans_generator=self.seq_clans_generator, rounds=self.rounds_to_cluster)
+        input_output_dict_sequence = self._generate_input_output_files_dict(self.datasets_dir, self.clans_files_seqsim_dir)
+        run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type="fasta", blast_dir=self.blast_dir, clans_generator=self.seq_clans_generator, rounds=rounds_to_cluster)
         print("Evaluation initialized. Clans files generated and clustered for each dataset with structure similarity scores and sequence similarity scores.")
+        return self._match_clans_files_for_comparison(self.clans_files_structsim_dir, self.clans_files_seqsim_dir)
     
     
     def evaluate(self, structural_to_sequence_clans_files: dict):
@@ -101,18 +112,74 @@ class ScoresEvaluator:
             #df_graph_comparison = self._compare_graphs(G_struct, G_seq)
             
         print("Evaluation completed.")
-        self._display_evaluation_results(df_numerical_comparisons, figures)
-        return df_evaluation_results
+        return df_evaluation_results, figures
         
         
-    def _display_evaluation_results(self, df_numerical_comparisons, figures):
+    def display_evaluation_results(self, df_numerical_comparisons, figures):
         print("Scatterplots: ")
         for fig in figures:
             fig
         print("Numerical comparison results:")
         print(df_numerical_comparisons)
-        # add further results here:
+        # add further results here:    
     
+    
+    def _set_up_datasets_dir(self, use_existing_dataset, path_to_dir_of_existing_datasets, datasets_meta_data):
+        """
+        Generates datasets with the given datasets_meta_data in self.datasets_dir.
+        If use_existing_dataset is True, it copys the content of the folder of existing datasets to self.datasets_dir.
+
+        Args:
+            use_existing_dataset (bool): Whether to use an existing dataset directory.
+            path_to_dir_of_existing_datasets (str): Path to existing datasets if use_existing_dataset is True.
+            datasets_meta_data (dict): Metadata for generating datasets if not using existing datasets.
+
+        Raises:
+            ValueError: If use_existing_dataset is True but no path is provided.
+        """
+        if use_existing_dataset:
+            if path_to_dir_of_existing_datasets is None:
+                raise ValueError("Path to existing datasets must be provided if use_existing_dataset is True.")
+            copy_dir_content(path_to_dir_of_existing_datasets, self.datasets_dir)
+        else:
+            self._generate_datasets(datasets_meta_data)
+            
+        
+    def _set_up_dirs(self, leave_as_is: list = []):
+        """
+        Sets up the necessary directories for the evaluation.
+        Creates directories for datasets, structures, clans files and blast files.
+        Deletes the content of the directories if they already exist.
+        Args:
+            leave_as_is (list): A list of directory paths which should not be deleted if they already exist
+        """
+        self.datasets_dir: str = f"{self.working_dir}/datasets"
+        self.structures_dir = f"{self.working_dir}/structures"
+        self.clans_files_structsim_dir = f"{self.working_dir}/clans_files_structsim" # dir for clans files generated with structure similarity scores
+        self.clans_files_seqsim_dir = f"{self.working_dir}/clans_files_seqsim" # dir for clans files generated with sequence similarity scores
+        self.blast_dir = f"{self.working_dir}/blast_files"
+        dirs = [self.datasets_dir, self.structures_dir, self.clans_files_structsim_dir, self.blast_dir, self.clans_files_seqsim_dir]
+        for dir_path in dirs:
+            if dir_path not in leave_as_is:
+                reset_dir_content(dir_path)
+
+
+    def _generate_datasets(self, dataset_information: dict):
+        """
+        Generates datasets (fasta_files) by calling the DatasetGenerator class.
+        The datasets are saved in the out_dir.
+        
+        Args:
+            dataset_information: A dictionary containing for each dataset; size_of_dataset (int), number of clusters (int) and seeds (list of str).
+            out_dir: directory where to save the datasets
+        """
+        for dataset_name, meta_data in dataset_information.items():
+            size = meta_data["size_of_dataset"]
+            n_cl = meta_data["number_of_clusters"]
+            seeds = meta_data["seeds"]
+            print(f"Generating dataset {dataset_name} with {size} sequences and {n_cl} clusters...")
+            self.dataset_generator.generate(size, n_cl, seeds, f"{dataset_name}.fasta")
+            
     
     def _prepare_scores(self, struct_clans_file: ClansFile, seq_clans_file: ClansFile) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
@@ -349,7 +416,7 @@ class ScoresEvaluator:
         return merged_scores, merged_coordinates
     
     
-    def match_clans_files_for_comparison(self, structural_clans_dir, sequence_clans_dir):
+    def _match_clans_files_for_comparison(self, structural_clans_dir, sequence_clans_dir):
         """
         This method matches the clans files generated with structure similarity scores to the clans files generated with sequence similarity scores.
         It returns a dictionary which maps the structural clans file path to the sequence clans file path.
@@ -391,89 +458,75 @@ class ScoresEvaluator:
         return input_output_files
 
 
-    def _compute_clans_files(self, scores_for_each_dataset: dict, generated_datasets_dir, number_of_datasets):
+    def _compute_clans_files(self, scores_for_each_dataset: dict, fasta_files: dict):
         """
-        Generates clans files for each dataset based on the computed scores.
+        Generates clans files for each fasta file based on the computed scores.
 
         Args:
             scores_for_each_dataset (dict): A dictionary containing the scores for each dataset.
-            generated_datasets_dir: A path to the generated datasets
-            number_of_datasets: number of generated datasets
+            fasta_files: A dictionary mapping dataset names to paths of the cleaned fasta files.
         """
-        for i in range(number_of_datasets):
-            cleaned_dataset_i_path = os.path.join(generated_datasets_dir, f"dataset_{i+1}_cleaned.fasta")
-            self.struct_clans_generator.generate_clans_file(scores_for_each_dataset[i], cleaned_dataset_i_path)
+        for dataset_name, cleaned_dataset_path in fasta_files.items():
+            self.struct_clans_generator.generate_clans_file(scores_for_each_dataset[dataset_name], cleaned_dataset_path)
 
-    
-    def _compute_scores(self, pdbs, number_of_datasets):
+
+    def _compute_scores(self, structures_dir: str) -> dict:
         """
-        Computes the structure similarity scores for the generated datasets.
+        Computes pairwise structure similarity scores for the given structures.
         
         Args:
-            pdbs: A directory with directorys of pdbs for each dataset
+            structures_dir: A directory with directories of pdbs for each dataset
         Returns:
             dict: A dictionary containing the scores for each dataset.
         """
         scores = {}
-        for i in range(number_of_datasets):
-            pdb_dir_for_dataset = os.path.join(pdbs, f"dataset_{i+1}")
-            print(f"Computing scores for dataset {i+1}/{number_of_datasets}...")
-            scores[i] = self.scores_computer.run(self.tool_type, pdb_dir_for_dataset)
+        for sub_dir in os.listdir(structures_dir):
+            path_to_subdir = os.path.join(structures_dir, sub_dir)
+            print(f"Computing scores for dataset {sub_dir}...")
+            scores[sub_dir] = self.scores_computer.run(self.tool_type, path_to_subdir)
         return scores
-
-
-    def _download_pdbs(self, generated_datasets_dir, out_dir):
+    
+    
+    def _generate_fasta_from_uids_with_regions_for_each_dataset(self, uids_with_regions_for_each_dataset: dict, datasets_dir: str) -> dict:
         """
-        Downloads the PDB files for the generated datasets.
-        For each dataset, the corresponding PDB files are downloaded in a separated directory in the self.pdbs_dir.
+        Generates fasta files from the given uids with regions for each dataset.
         Args:
-            path_to_datasets: path to the datasets for which to download the corresponding pdbs
-            out_dir: path to the directory where the pdbs are saved
-        """
-        print("Downloading PDB files for the generated datasets...")
-        dataset_files = [f for f in os.listdir(generated_datasets_dir) if f.endswith(".fasta")]
-        for i in range(len(dataset_files)):
-            dataset_path = os.path.join(generated_datasets_dir,f"dataset_{i+1}.fasta")
-            # create pdb dir for each dataset
-            pdb_dir_for_dataset = os.path.join(out_dir, f"dataset_{i+1}")
-            delete_dir_content(pdb_dir_for_dataset)
-            print(f"Downloading PDB files for dataset dataset_{i+1}...")
-            fetch_pdbs(dataset_path, InputFileType.FASTA, pdb_dir_for_dataset)
-    
-    
-    def _generate_datasets(self, n, size, seeds):
-        """
-        Generates n datasets (fasta_files) by calling the dataset generator.
-        The datasets are saved in the out_dir.
-        
-        Args
-            n: number of datasets to generate
-            size: size of each dataset
-            seeds: seed sequences for the Dataset-Generator
-            out_dir: directory where to save the datasets
-        """
-        n_cl_per_dataset = len(seeds) // n
-        print(f"Generating {n} datasets with {size} sequences each...")
-        for i in range(n):
-            print(f"Generating dataset {i+1}/{n}...")
-            seeds_for_current_dataset = seeds[i*n_cl_per_dataset:(i+1)*n_cl_per_dataset]
-            self.dataset_generator.generate(size, n_cl_per_dataset, seeds_for_current_dataset, f"dataset_{i+1}.fasta")
-
-
-    def _check_for_correct_input(self, number_of_datasets, seeds):
-        """Checks if the input parameters are correct.
-
-        Raises:
-            ValueError: If number_of_datasets is less than or equal to 0.
-            ValueError: If the number of seeds is less than the number of datasets.
-
+            uids_with_regions_for_each_dataset: A dictionary containing uids with regions for each dataset.
+            datasets_dir: Directory where the datasets are stored.
         Returns:
-            None
+            dict: A dictionary mapping dataset names to paths of the generated fasta files.
         """
-        if number_of_datasets <= 0:
-            raise ValueError("Number of datasets must be greater than 0.")
-        elif len(seeds) < number_of_datasets:
-            raise ValueError("Number of seeds must be greater than or equal to number of datasets.")
-        else:
-            self.number_of_datasets = number_of_datasets
-            self.seeds = seeds
+        paths_to_cleaned_datasets = {}
+        for dataset in os.listdir(datasets_dir):
+            dataset_name = os.path.splitext(dataset)[0]
+            cleaned_dataset_path = os.path.join(datasets_dir, f"{dataset_name}_cleaned.fasta")
+            uids_with_regions = uids_with_regions_for_each_dataset[dataset_name]
+            cleaned_dataset_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_dataset_path, os.path.join(datasets_dir, dataset))
+            paths_to_cleaned_datasets[dataset_name] = cleaned_dataset_path
+        return paths_to_cleaned_datasets
+
+
+    def _download_pdbs(self, path_to_datasets, out_dir):
+        """
+        Downloads structure files for the datasets.
+        For each dataset, the corresponding structure files are downloaded in a separated directory in the self.structures_dir.
+        Args:
+            path_to_datasets: path to the datasets for which to download the corresponding structure files
+            out_dir: path to the directory where the structure files are saved
+        Returns:
+            dict: Containing downloaded uids together with their regions for each dataset.
+        """
+        uids_with_regions_for_each_dataset = {}
+        print("Downloading structure files for the datasets...")
+        datasets = [f for f in os.listdir(path_to_datasets)]
+        for dataset in datasets:
+            dataset_path = os.path.join(path_to_datasets, dataset)
+            # create dir for each dataset
+            dataset_name = os.path.splitext(dataset)[0]
+            dir_for_dataset_structures = os.path.join(out_dir, dataset_name)
+            reset_dir_content(dir_for_dataset_structures)
+            print(f"Downloading structure files for dataset {dataset}...")
+            uids_with_regions = fetch_pdbs(dataset_path, InputFileType.FASTA, dir_for_dataset_structures)
+            uids_with_regions_for_each_dataset[dataset_name] = uids_with_regions
+        return uids_with_regions_for_each_dataset
+    

@@ -114,9 +114,9 @@ def _create_clans_file(saved_input_file, input_file_type, selected_tool, foldsee
     input_file_dir = os.path.dirname(saved_input_file)
     cleaned_input_file_path = os.path.join(input_file_dir, f"{input_file_name}_cleaned.fasta")
     if input_file_type == InputFileType.FASTA:
-        generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path, saved_input_file)
+        cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path, saved_input_file)
     else:
-        generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path)
+        cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path)
     scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
     scores = scores_computer.run(selected_tool, "PDBs")
     clans_generator = ClansFileGenerator()

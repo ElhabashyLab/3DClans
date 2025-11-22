@@ -2,6 +2,7 @@ from USalign import USalign
 from TMalign import TMalign
 from Foldseek import Foldseek
 from ToolType import ToolType
+import os
 
 
 class StructSimComputer:
@@ -24,7 +25,12 @@ class StructSimComputer:
         for tool in self.tools:
             if tool.name == tool_type.value:
                 print(f"Computing structural similarity with {tool.name}...")
+                num_structures = len(os.listdir(pdb_dir))
+                # small Gaus without the biggest factor of the sum 
+                expected_number_of_scores = (num_structures * (num_structures + 1) // 2) - num_structures
                 scores = tool.start_run(pdb_dir)
+                if scores is None or len(scores) != expected_number_of_scores:
+                    raise ValueError(f"Error: {tool.name} did not return the expected number of scores. Expected {expected_number_of_scores}, got {len(scores) if scores else 'None'}.")
                 print(f"Structural similarity computation with {tool.name} completed.")
                 return scores
             else:

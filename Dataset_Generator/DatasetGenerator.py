@@ -171,7 +171,7 @@ class DatasetGenerator:
             
 # test
 example_seeds = ["P68871", "Q99895", "P42212", "P00734", "P69905", "P0A6F5", "Q8N3C0", "P00519", "P00846", "P00390", "P02754", "Q8RWR1"]
-generator = DatasetGenerator()
+# generator = DatasetGenerator()
 #generator.generate(15, 2, ["P42212", "Q99895"], "test.fasta")
 #for i in range(4):
     #generator.generate(15, 3, example_seeds[i*3:(i+1)*3], f"example_{i+1}.fasta")

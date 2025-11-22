@@ -1,6 +1,6 @@
 from ClansFile import ClansFile
 import os
-from utils_for_PDB import extract_uids_from_fasta, delete_dir_content
+from utils_for_PDB import extract_uids_from_fasta, reset_dir_content
 import numpy as np
 
 
@@ -12,7 +12,7 @@ class ClansFileGenerator:
     def __init__(self, output_dir="clans_files"):
         self.output_dir = output_dir
         if os.path.exists(self.output_dir):
-            delete_dir_content(self.output_dir)
+            reset_dir_content(self.output_dir)
         else:
             os.makedirs(self.output_dir)
 

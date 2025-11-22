@@ -2,7 +2,7 @@ from StructSimTool import StructSimTool
 import os
 import pandas as pd
 from io import StringIO
-from utils_for_PDB import delete_dir_content
+from utils_for_PDB import reset_dir_content
 
 
 
@@ -13,7 +13,7 @@ class TMalign(StructSimTool):
     def __init__(self):
         description = "A tool for protein structure comparison using TMalign."
         if os.path.exists("TMalign_working_dir"):
-            delete_dir_content("TMalign_working_dir")
+            reset_dir_content("TMalign_working_dir")
         else:
             os.makedirs("TMalign_working_dir")
         working_dir = "TMalign_working_dir/"

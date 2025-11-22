@@ -2,7 +2,7 @@ from StructSimTool import StructSimTool
 import os
 import pandas as pd
 from io import StringIO
-from utils_for_PDB import delete_dir_content
+from utils_for_PDB import reset_dir_content
 
 
 class USalign(StructSimTool):
@@ -12,7 +12,7 @@ class USalign(StructSimTool):
     def __init__(self):
         description = "A tool for protein structure comparison using USalign."
         if os.path.exists("USalign_working_dir"):
-            delete_dir_content("USalign_working_dir")
+            reset_dir_content("USalign_working_dir")
         else:
             os.makedirs("USalign_working_dir")
         working_dir = "USalign_working_dir/"

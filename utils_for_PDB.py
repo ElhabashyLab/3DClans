@@ -33,13 +33,38 @@ def download_file(url, output_path):
         return False
     
 
-def delete_dir_content(dir_path):
+def reset_dir_content(dir_path):
     """
     Deletes the content of the specified directory and creates it if it does not exists.
     """
     if os.path.exists(dir_path):
         shutil.rmtree(dir_path)
     os.makedirs(dir_path)
+    
+    
+def copy_dir_content(source_dir, target_dir):
+    """
+    Copies all files and subdirectories from source_dir into target_dir.
+    Creates target_dir if it does not exist.
+
+    Args:
+        source_dir (str): Path to the directory to copy FROM
+        target_dir (str): Path to the directory to copy TO
+    """
+    # Ensure target exists
+    os.makedirs(target_dir, exist_ok=True)
+
+    # Iterate through items in source_dir
+    for item in os.listdir(source_dir):
+        src = os.path.join(source_dir, item)
+        dst = os.path.join(target_dir, item)
+
+        if os.path.isdir(src):
+            # Copy a directory recursively
+            shutil.copytree(src, dst, dirs_exist_ok=True)
+        else:
+            # Copy a single file
+            shutil.copy2(src, dst)
 
 
 def extract_uids_from_fasta(fasta_file):
@@ -127,9 +152,9 @@ def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir:
         output_dir: The directory where the downloaded PDBs are stored.
         
     Returns:
-        dict: Path to cleaned version of the input_file containing only successfully downloaded elements.
+        dict: Containing downloaded uids together with their regions.
     """    
-    delete_dir_content(output_dir)
+    reset_dir_content(output_dir)
     if input_file_type is InputFileType.FASTA:
         return process_fasta_file(input_file_path, output_dir)
     elif input_file_type is InputFileType.TSV:
@@ -241,7 +266,7 @@ def extract_region_of_protein(path_to_protein: str, file_type: str, region: list
     meta_data = get_meta_data_of_structure_file(path_to_protein)
     meta_data_corrected = adapt_metadata_to_region(meta_data, region)
     with open(output_path, "w") as out:
-        # out.writelines(meta_data_corrected)
+        out.writelines(meta_data_corrected)
         io = PDBIO()
         io.set_structure(structure)
         io.save(out, select=SelectRegion())
@@ -364,6 +389,7 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
         uids_with_regions (dict): Mapping {uid: [region_start, region_end] or None}.
         out_path (str): Path to the output FASTA file.
         original_fasta (str, optional): Path to an existing FASTA file with sequences.
+    Returns:
     """
     # generate fasta with original fasta records
     if original_fasta is not None:
@@ -381,6 +407,7 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
                 fallback_record = create_mok_up_record(uid, region)
                 records.append(fallback_record)
         SeqIO.write(records, out_path, "fasta")
+    return out_path
 
 
 def create_mok_up_record(uid: str, region: list[int] | None) -> SeqRecord:
