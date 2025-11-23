@@ -1,6 +1,6 @@
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # to import from parent dir
+sys.path.append(os.path.abspath(".."))
 from Dataset_Generator.DatasetGenerator import DatasetGenerator
 from old_clans.utils_old_clans import run_clans_headless
 from utils_for_PDB import *
@@ -51,7 +51,13 @@ class ScoresEvaluator:
         self.path_to_recovered_clans = path_to_recovered_clans
 
 
-    def initialize_evaluation(self, rounds_to_cluster: int, datasets_meta_data: dict, use_existing_dataset: bool = False, path_to_dir_of_existing_datasets: Optional[str] = None) -> dict:
+    def initialize_evaluation(self,
+                              rounds_to_cluster: int,
+                              datasets_meta_data: Optional[dict] = None,
+                              use_existing_dataset: bool = False,
+                              path_to_dir_of_existing_datasets: Optional[str] = None,
+                              datasets_file_type: InputFileType = InputFileType.FASTA
+                              ) -> dict:
         """
         Generates or uses existing datasets.
         Downloads the corresponding PDB files of the datasets, computes structure similarity scores and creates clans files from those.
@@ -62,12 +68,13 @@ class ScoresEvaluator:
             datasets_meta_data: A dictionary containing for each dataset; size_of_dataset (int), number of clusters (int) and seeds (list of str).
             use_existing_dataset: Whether to use existing datasets or generate new ones.
             path_to_dir_of_existing_datasets: Path to existing datasets if use_existing_dataset is True.
+            datasets_file_type: The type of the dataset files in the existing datasets. If None, FASTA is assumed.
         Retruns:
             dict: A dictionary mapping structural clans file paths to sequence clans file paths.
         """
         print("Initializing evaluation...")
         self._set_up_datasets_dir(use_existing_dataset, path_to_dir_of_existing_datasets, datasets_meta_data)
-        uids_with_regions_for_each_dataset = self._download_pdbs(self.datasets_dir, self.structures_dir)  
+        uids_with_regions_for_each_dataset = self._download_pdbs(self.datasets_dir, self.structures_dir, datasets_file_type)  
         paths_to_cleaned_datasets = self._generate_fasta_from_uids_with_regions_for_each_dataset(uids_with_regions_for_each_dataset, self.datasets_dir)
         scores_for_each_dataset = self._compute_scores(self.structures_dir)
         self._compute_clans_files(scores_for_each_dataset, paths_to_cleaned_datasets)
@@ -142,6 +149,8 @@ class ScoresEvaluator:
                 raise ValueError("Path to existing datasets must be provided if use_existing_dataset is True.")
             copy_dir_content(path_to_dir_of_existing_datasets, self.datasets_dir)
         else:
+            if datasets_meta_data is None:
+                raise ValueError("Datasets metadata must be provided if not using existing datasets.")
             self._generate_datasets(datasets_meta_data)
             
         
@@ -506,7 +515,7 @@ class ScoresEvaluator:
         return paths_to_cleaned_datasets
 
 
-    def _download_pdbs(self, path_to_datasets, out_dir):
+    def _download_pdbs(self, path_to_datasets: str, out_dir: str, datasets_file_type: InputFileType) -> dict:
         """
         Downloads structure files for the datasets.
         For each dataset, the corresponding structure files are downloaded in a separated directory in the self.structures_dir.
@@ -526,7 +535,7 @@ class ScoresEvaluator:
             dir_for_dataset_structures = os.path.join(out_dir, dataset_name)
             reset_dir_content(dir_for_dataset_structures)
             print(f"Downloading structure files for dataset {dataset}...")
-            uids_with_regions = fetch_pdbs(dataset_path, InputFileType.FASTA, dir_for_dataset_structures)
+            uids_with_regions = fetch_pdbs(dataset_path, datasets_file_type, dir_for_dataset_structures)
             uids_with_regions_for_each_dataset[dataset_name] = uids_with_regions
         return uids_with_regions_for_each_dataset
     
