@@ -62,7 +62,7 @@ class ClansFileGenerator:
     def _transform_scores_to_clans_format(self, scores, uids):
         """
         Transform the pairwise similarity scores into the format required by CLANS.
-        1. Changes the names of the PDBs to their corresponding indices of the input fasta.
+        1. Changes the names of the structures to their corresponding indices of the input fasta.
         2. Changes the order of the rows to this format (with f.e. 3 fasta entries):
          PDBchain1  PDBchain2   score
             0     1      0.8

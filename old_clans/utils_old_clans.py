@@ -2,6 +2,8 @@ import subprocess
 import os
 import pandas as pd
 from ClansFileGenerator import ClansFileGenerator
+from InputFileType import InputFileType
+from utils_for_PDB import extract_uid_from_recordID
 
 
 # This is the path to the recovered clans project directory (github-repo: https://github.com/AronWichtner/clans-recovered.git)
@@ -43,6 +45,8 @@ def run_clans_headless_from_f_file(recovered_clans_path: str, input_file: str, o
     blast_results_path = os.path.join(blast_dir, f"{input_file_name}_blast.tsv")
     [blast_results_path, outformat] = blast_fasta(input_file, blast_results_path, blast_dir)
     blast_results_df = pd.read_csv(blast_results_path, sep="\t", names=["PDBchain1", "PDBchain2", "score"])
+    blast_results_df["PDBchain1"] = blast_results_df["PDBchain1"].apply(extract_uid_from_recordID)
+    blast_results_df["PDBchain2"] = blast_results_df["PDBchain2"].apply(extract_uid_from_recordID)
     blast_results_df = blast_results_df[blast_results_df['PDBchain1'] != blast_results_df['PDBchain2']] # remove self-hits
     blast_results_df = blast_results_df.drop_duplicates(subset=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
     clans_file_path = clans_file_generator.generate_clans_file(blast_results_df, input_file)
@@ -71,8 +75,9 @@ def blast_fasta(fasta_file: str, output_file: str, working_dir: str):
     subprocess.run(blast_cmd, check=True)
     return [output_file, outfmt.split(" ")[1:]]
     
+    
 
-def run_clans_headless(recovered_clans_path: str, input_output_files: dict, input_file_type: str = "clans", rounds: int = 100000, blast_dir = None, clans_generator = None):
+def run_clans_headless(recovered_clans_path: str, input_output_files: dict, input_file_type: InputFileType, rounds: int = 100000, blast_dir = None, clans_generator = None):
     """
     Runs recovered clans in headless mode on each of the given input files and saves the output to the corresponding output files.
     The input_output_files dict should contain input_file: output_file pairs.
@@ -86,16 +91,16 @@ def run_clans_headless(recovered_clans_path: str, input_output_files: dict, inpu
     Returns: None
     """
     for input_file, output_file in input_output_files.items():
-        if input_file_type == "clans":
+        if input_file_type == InputFileType.CLANS:
             run_clans_headless_from_c_file(recovered_clans_path, input_file, output_file, rounds)
-        elif input_file_type == "fasta":
+        elif input_file_type == InputFileType.FASTA:
             if blast_dir is None:
                 raise ValueError("blast_dir must be provided when input_file_type is 'fasta'")
             if clans_generator is None:
                 raise ValueError("clans_generator must be provided when input_file_type is 'fasta'")
             run_clans_headless_from_f_file(recovered_clans_path, input_file, output_file, blast_dir, clans_generator, rounds)
         else:
-            raise ValueError(f"Invalid input file type: {input_file_type}. Supported types are 'clans' and 'fasta'.")
+            raise ValueError(f"Invalid input file type: {input_file_type}. Supported types are {InputFileType.CLANS} and {InputFileType.FASTA}.")
         _remove_colorcutoffs_colorarr(output_file)
 
 

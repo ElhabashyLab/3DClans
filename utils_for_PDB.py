@@ -214,7 +214,7 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
         if pd.isna(start) or pd.isna(end):
             region = None
         else:
-            region = [start, end]
+            region = [int(start), int(end)]
         if download_alphafold_structure(uid, output_dir, region):
             successful_downloads += 1
             uids_with_regions[uid] = region
