@@ -12,9 +12,12 @@ PDBs_for_benchmark
 clans_files
 input_file_storage
 Dataset_Generator/psiblast_results.xml
+Dataset_Generator/__pycache__
+Scores_Evaluation/__pycache__
 Scores_Evaluation/clans_files_*
 Scores_Evaluation/blast_files
-Scores_Evaluation/generated_datasets
-Scores_Evaluation/PDBs
+Scores_Evaluation/datasets
+Scores_Evaluation/structures
 Scores_Evaluation/*_working_dir
+old_clans/__pycache__
 dbs

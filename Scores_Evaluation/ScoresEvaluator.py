@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.abspath(".."))
 from Dataset_Generator.DatasetGenerator import DatasetGenerator
 from old_clans.utils_old_clans import run_clans_headless
-from utils_for_PDB import copy_dir_content, reset_dir_content
+from utils_for_PDB import copy_dir_content, reset_dir_content, generate_fasta_from_uids_with_regions, fetch_pdbs
 from StructSimComputer import StructSimComputer
 from ClansFileGenerator import ClansFileGenerator
 from ClansFile import ClansFile
