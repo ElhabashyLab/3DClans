@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.abspath(".."))
 from Dataset_Generator.DatasetGenerator import DatasetGenerator
 from old_clans.utils_old_clans import run_clans_headless
-from utils_for_PDB import *
+from utils_for_PDB import copy_dir_content, reset_dir_content
 from StructSimComputer import StructSimComputer
 from ClansFileGenerator import ClansFileGenerator
 from ClansFile import ClansFile
@@ -74,17 +74,17 @@ class ScoresEvaluator:
         """
         print("Initializing evaluation...")
         self._set_up_datasets_dir(use_existing_dataset, path_to_dir_of_existing_datasets, datasets_meta_data)
-        uids_with_regions_for_each_dataset = self._download_pdbs(self.datasets_dir, self.structures_dir, datasets_file_type)  
-        paths_to_cleaned_datasets = self._generate_fasta_from_uids_with_regions_for_each_dataset(uids_with_regions_for_each_dataset, self.datasets_dir)
-        scores_for_each_dataset = self._compute_scores(self.structures_dir)
-        self._compute_clans_files(scores_for_each_dataset, paths_to_cleaned_datasets)
+        uids_with_regions_for_each_dataset = self._download_pdbs(self.datasets_dir, self.structures_dir, datasets_file_type)
+        paths_to_cleaned_datasets = self._generate_fasta_from_uids_with_regions_for_each_dataset(uids_with_regions_for_each_dataset, self.datasets_dir, datasets_file_type)
+        scores_for_each_dataset = self._compute_struct_scores(self.structures_dir)
+        self._compute_struct_clans_files(scores_for_each_dataset, paths_to_cleaned_datasets)
         # clustering clans files with recovered clans
         print("Running recovered clans.jar on the generated structural clans files...")
         input_output_dict_structural = self._generate_input_output_files_dict(self.clans_files_structsim_dir, self.clans_files_structsim_dir)
-        run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type="clans", rounds=rounds_to_cluster)
-        print("Running recovered clans.jar with sequences similarity scores...")
+        run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type=InputFileType.CLANS, rounds=rounds_to_cluster)
+        print("Running recovered clans.jar with fasta files (using sequence similarity)...")
         input_output_dict_sequence = self._generate_input_output_files_dict(self.datasets_dir, self.clans_files_seqsim_dir)
-        run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type="fasta", blast_dir=self.blast_dir, clans_generator=self.seq_clans_generator, rounds=rounds_to_cluster)
+        run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type=InputFileType.FASTA, blast_dir=self.blast_dir, clans_generator=self.seq_clans_generator, rounds=rounds_to_cluster)
         print("Evaluation initialized. Clans files generated and clustered for each dataset with structure similarity scores and sequence similarity scores.")
         return self._match_clans_files_for_comparison(self.clans_files_structsim_dir, self.clans_files_seqsim_dir)
     
@@ -467,7 +467,7 @@ class ScoresEvaluator:
         return input_output_files
 
 
-    def _compute_clans_files(self, scores_for_each_dataset: dict, fasta_files: dict):
+    def _compute_struct_clans_files(self, scores_for_each_dataset: dict, fasta_files: dict):
         """
         Generates clans files for each fasta file based on the computed scores.
 
@@ -479,7 +479,7 @@ class ScoresEvaluator:
             self.struct_clans_generator.generate_clans_file(scores_for_each_dataset[dataset_name], cleaned_dataset_path)
 
 
-    def _compute_scores(self, structures_dir: str) -> dict:
+    def _compute_struct_scores(self, structures_dir: str) -> dict:
         """
         Computes pairwise structure similarity scores for the given structures.
         
@@ -496,12 +496,13 @@ class ScoresEvaluator:
         return scores
     
     
-    def _generate_fasta_from_uids_with_regions_for_each_dataset(self, uids_with_regions_for_each_dataset: dict, datasets_dir: str) -> dict:
+    def _generate_fasta_from_uids_with_regions_for_each_dataset(self, uids_with_regions_for_each_dataset: dict, datasets_dir: str, datasets_file_type: InputFileType) -> dict:
         """
         Generates fasta files from the given uids with regions for each dataset.
         Args:
             uids_with_regions_for_each_dataset: A dictionary containing uids with regions for each dataset.
             datasets_dir: Directory where the datasets are stored.
+            datasets_file_type: Specifies the type of the dataset files.
         Returns:
             dict: A dictionary mapping dataset names to paths of the generated fasta files.
         """
@@ -510,7 +511,11 @@ class ScoresEvaluator:
             dataset_name = os.path.splitext(dataset)[0]
             cleaned_dataset_path = os.path.join(datasets_dir, f"{dataset_name}_cleaned.fasta")
             uids_with_regions = uids_with_regions_for_each_dataset[dataset_name]
-            cleaned_dataset_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_dataset_path, os.path.join(datasets_dir, dataset))
+            if datasets_file_type == InputFileType.FASTA:
+                original_fasta_path = os.path.join(datasets_dir, dataset)
+            else:
+                original_fasta_path = None
+            cleaned_dataset_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_dataset_path, original_fasta_path)
             paths_to_cleaned_datasets[dataset_name] = cleaned_dataset_path
         return paths_to_cleaned_datasets
 
