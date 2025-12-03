@@ -30,7 +30,11 @@ class StructSimComputer:
                 expected_number_of_scores = (num_structures * (num_structures + 1) // 2) - num_structures
                 scores = tool.start_run(pdb_dir)
                 if scores is None or len(scores) != expected_number_of_scores:
-                    raise ValueError(f"Error: {tool.name} did not return the expected number of scores. Expected {expected_number_of_scores}, got {len(scores) if scores else 'None'}.")
+                    if scores is None:
+                        len_scores = 0
+                    else:
+                        len_scores = len(scores)
+                    print(f"Warning: {tool.name} did not return the expected number of scores. Expected {expected_number_of_scores}, got {len_scores}.")
                 print(f"Structural similarity computation with {tool.name} completed.")
                 return scores
             else:

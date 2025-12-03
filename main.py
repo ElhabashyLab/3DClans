@@ -48,7 +48,7 @@ def _set_up_parser() -> argparse.ArgumentParser:
     Sets up the command line parser.
     :return: the parser
     """
-    parser = argparse.ArgumentParser(description="command line parser to read fasta or clans file")
+    parser = argparse.ArgumentParser(description="Command line parser to read fasta A2M or tsv files and generating clans files based on structural similarity scores.")
     
     parser.add_argument(
         "-l", "--load",

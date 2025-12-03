@@ -111,16 +111,17 @@ class Foldseek(StructSimTool):
         Receives a DataFrame containing the columns 'PDBchain1, PDBchain2, score'
         and returns a cleaned DataFrame with no duplicate rows like PDBchain1:PDBchain2 and PDBchain2:PDBchain1
         """
-        # remove duplicates like PDBchain1:PDBchain2 and PDBchain2:PDBchain1
+        # remove duplicates like A:B and B:A
         df["pairs"] = df.apply(lambda row: tuple(sorted([row['PDBchain1'], row['PDBchain2']])), axis=1)
         df1 = df.drop_duplicates(subset="pairs")
         df2 = df1.drop(columns=["pairs"])
-        # remove rows where PDBchain1 is the same as PDBchain2
+        # remove rows where A is the same as B
         df3 = df2[df2['PDBchain1'] != df2['PDBchain2']].copy()
         # clean scores based on self.score
         if self.score == "TM":
-            df3['score'] = df3[['TM1', 'TM2']].max(axis=1)
-            df4 = df3.drop(columns=['TM1', 'TM2'])
+            df3['maxTM'] = df3[['TM1', 'TM2']].max(axis=1)
+            df3["score"] = 1 - df3["maxTM"]
+            df4 = df3.drop(columns=['TM1', 'TM2', 'maxTM'])
         else:
             df3['score'] = df3['evalue']
             df4 = df3.drop(columns=['evalue'])

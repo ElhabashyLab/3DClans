@@ -15,6 +15,11 @@ import seaborn as sns
 import numpy as np
 import networkx as nx
 from typing import Optional
+from skbio.stats.distance import mantel
+from skbio import DistanceMatrix
+from sklearn.cluster import DBSCAN
+from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+from scipy.spatial import procrustes
 
 
 class ScoresEvaluator:
@@ -44,7 +49,7 @@ class ScoresEvaluator:
         self.working_dir = os.path.dirname(os.path.abspath("ScoresEvaluator.py"))
         self._set_up_dirs()
         self.dataset_generator = DatasetGenerator(self.datasets_dir)
-        self.scores_computer = StructSimComputer()
+        self.scores_computer = StructSimComputer(foldseek_score="evalue")
         self.tool_type = ToolType.FOLDSEEK
         self.struct_clans_generator = ClansFileGenerator(self.clans_files_structsim_dir)
         self.seq_clans_generator = ClansFileGenerator(self.clans_files_seqsim_dir) 
@@ -74,14 +79,15 @@ class ScoresEvaluator:
         """
         print("Initializing evaluation...")
         self._set_up_datasets_dir(use_existing_dataset, path_to_dir_of_existing_datasets, datasets_meta_data)
-        uids_with_regions_for_each_dataset = self._download_pdbs(self.datasets_dir, self.structures_dir, datasets_file_type)
+        uids_with_regions_for_each_dataset = self._download_structures(self.datasets_dir, self.structures_dir, datasets_file_type)
         paths_to_cleaned_datasets = self._generate_fasta_from_uids_with_regions_for_each_dataset(uids_with_regions_for_each_dataset, self.datasets_dir, datasets_file_type)
         scores_for_each_dataset = self._compute_struct_scores(self.structures_dir)
         self._compute_struct_clans_files(scores_for_each_dataset, paths_to_cleaned_datasets)
-        # clustering clans files with recovered clans
+        
         print("Running recovered clans.jar on the generated structural clans files...")
         input_output_dict_structural = self._generate_input_output_files_dict(self.clans_files_structsim_dir, self.clans_files_structsim_dir)
         run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type=InputFileType.CLANS, rounds=rounds_to_cluster)
+        
         print("Running recovered clans.jar with fasta files (using sequence similarity)...")
         input_output_dict_sequence = self._generate_input_output_files_dict(self.datasets_dir, self.clans_files_seqsim_dir)
         run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type=InputFileType.FASTA, blast_dir=self.blast_dir, clans_generator=self.seq_clans_generator, rounds=rounds_to_cluster)
@@ -91,35 +97,51 @@ class ScoresEvaluator:
     
     def evaluate(self, structural_to_sequence_clans_files: dict):
         """
-        Evaluates the clustered clans files generated with structure similarity scores and sequence similarity scores.
-        Returns a dataframe with the evaluation results consisting of numerical comparison, graph comparison and cluster comparison.
         Args:
             structural_to_sequence_clans_files: A dictionary mapping structural clans file paths to sequence clans file paths.
         """
-        df_evaluation_results = []
-        df_numerical_comparisons = pd.DataFrame()
+        evaluation_results = []
         figures = []
+        
         for struct_clans_file, seq_clans_file in structural_to_sequence_clans_files.items():
+            
             print(f"Evaluating structural clans file {struct_clans_file} with sequence clans file {seq_clans_file}...")
             parsed_struct_clans_file = ClansFileGenerator.parse_clans_file(struct_clans_file)
             parsed_seq_clans_file = ClansFileGenerator.parse_clans_file(seq_clans_file)
-            merged_scores_df, merged_coordinates_df = self._prepare_scores(parsed_struct_clans_file, parsed_seq_clans_file)
-            print(merged_scores_df, merged_coordinates_df)
+            
+            # computing metrics
+            scores_combined_df, coordinates_combined_df = self._prepare_scores(parsed_struct_clans_file, parsed_seq_clans_file)
+            print(scores_combined_df)
+            print(coordinates_combined_df)
             
             # numerical evaluation
-            figures.append(self._plot_similarity_scatter(merged_scores_df, x_col="score_struct_log10_min-max-scaled", y_col="score_seq_log10_min-max-scaled", prevent_display=False))
-            df_numerical_comparison = self._compare_numerically(merged_scores_df, ["score_struct_log10", "score_seq_log10"])
-            df_numerical_comparisons = pd.concat([df_numerical_comparisons, df_numerical_comparison], ignore_index=True)
+            figures.append(self._plot_similarity_scatter(scores_combined_df, x_col="score_struct_log10_min-max-scaled", y_col="score_seq_log10_min-max-scaled", prevent_display=False))
+            df_numerical_comparison = self._compare_numerically(scores_combined_df)
+            print(df_numerical_comparison)
             
-            # graph evaluation
-            coordinates_for_struct = merged_coordinates_df[["PDBchain1", "x_struct", "y_struct", "z_struct"]]
-            coordinates_for_seq = merged_coordinates_df[["PDBchain1", "x_seq", "y_seq", "z_seq"]]
-            G_struct = self._build_graph_from_scores(merged_scores_df[["PDBchain1", "PDBchain2", "score_struct"]], coordinates_for_struct)
-            G_seq = self._build_graph_from_scores(merged_scores_df[["PDBchain1", "PDBchain2", "score_seq"]], coordinates_for_seq)
-            #df_graph_comparison = self._compare_graphs(G_struct, G_seq)
+            # overall graph evaluation
+            coordinates_struct = coordinates_combined_df[["PDBchain1", "x_struct", "y_struct", "z_struct"]]
+            coordinates_seq = coordinates_combined_df[["PDBchain1", "x_seq", "y_seq", "z_seq"]]
+            G_struct = self._build_graph_from_scores(scores_combined_df[["PDBchain1", "PDBchain2", "score_struct"]], coordinates_struct)
+            G_seq = self._build_graph_from_scores(scores_combined_df[["PDBchain1", "PDBchain2", "score_seq"]], coordinates_seq)
+            df_graph_comparison = self._compare_graphs(G_struct, G_seq)
+            print(df_graph_comparison)
             
+            # cluster evaluation
+            coord_and_cluster_labels_combined_df = self._get_cluster_labels(coordinates_combined_df)
+            print(coord_and_cluster_labels_combined_df)
+            ari = adjusted_rand_score(coord_and_cluster_labels_combined_df["cluster_label_struct"], coord_and_cluster_labels_combined_df["cluster_label_seq"])
+            nmi = normalized_mutual_info_score(coord_and_cluster_labels_combined_df["cluster_label_struct"], coord_and_cluster_labels_combined_df["cluster_label_seq"])
+            coord_struct_z_score = coord_and_cluster_labels_combined_df[["x_struct_z-scores", "y_struct_z-scores", "z_struct_z-scores"]]
+            coord_seq_z_score = coord_and_cluster_labels_combined_df[["x_seq_z-scores", "y_seq_z-scores", "z_seq_z-scores"]]
+            mtx1, mtx2, disparity = procrustes(coord_seq_z_score, coord_struct_z_score)
+            df_cluster_comparison = pd.DataFrame({"ari": [ari], "nmi": [nmi], "procrustes_disparity": [disparity]})
+            cluster_overlap_df = self._compute_cluster_overlap(coord_and_cluster_labels_combined_df[["PDBchain1", "cluster_label_struct", "cluster_label_seq"]])
+            print(df_cluster_comparison)
+            print(cluster_overlap_df)
+        
         print("Evaluation completed.")
-        return df_evaluation_results, figures
+        return evaluation_results, figures
         
         
     def display_evaluation_results(self, df_numerical_comparisons, figures):
@@ -204,11 +226,12 @@ class ScoresEvaluator:
             pd.DataFrame: A DataFrame containing the original scores of both ClansFiles,
             log-transformed scores, min-max scaled-scores and z-scores and a DataFrame containing the coordinates for each PDBchain.
         """
-        merged_scores_df, merged_coordinates = self._get_merged_scores_and_cooridinates_df(struct_clans_file, seq_clans_file)
-        merged_scores_df = self._log_transform(merged_scores_df, ["score_struct", "score_seq"])
-        merged_scores_df = self._normalize_scores(merged_scores_df, ["score_struct_log10", "score_seq_log10"], "z-score")
-        merged_scores_df = self._normalize_scores(merged_scores_df, ["score_struct_log10", "score_seq_log10"], "min-max")
-        return merged_scores_df, merged_coordinates
+        scores_combined_df, coordinates_combined_df = self._get_combined_scores_and_coordinates_df(struct_clans_file, seq_clans_file)
+        scores_combined_df = self._log_transform(scores_combined_df, ["score_struct", "score_seq"])
+        scores_combined_df = self._normalize_scores(scores_combined_df, ["score_struct_log10", "score_seq_log10"], "z-score")
+        scores_combined_df = self._normalize_scores(scores_combined_df, ["score_struct_log10", "score_seq_log10"], "min-max")
+        coordinates_combined_df = self._normalize_scores(coordinates_combined_df, ["x_struct", "y_struct", "z_struct", "x_seq", "y_seq", "z_seq"], "z-score")
+        return scores_combined_df, coordinates_combined_df
         
         
     def _normalize_scores(self, df: pd.DataFrame, columns: list, norm_type: str) -> pd.DataFrame: 
@@ -338,37 +361,101 @@ class ScoresEvaluator:
         return fig
         
 
-    def _compare_numerically(self, df_combined: pd.DataFrame, columns: list) -> pd.DataFrame:
+    def _compare_numerically(self, df_combined: pd.DataFrame) -> pd.DataFrame:
         """
-        Compares the scores of 2 given columns numerically.
+        Compares the scores of columns contained in df_combined numerically.
         Returns a dataframe with the comparison results.
-        The scores of the given columns are compared with the metrics: 
-        Correlation(Spearman and Pearson), RMSD
+        The following metrics are computed: 
+        Correlation(Spearman and Pearson), RMSD, mantel_corr and mantel_p_value
         Args:
-            df_combined: A dataframe with the merged scores of the structural clans file and the sequence clans file.
-            columns: A list of 2 columns contained in df_combined.
+            df_combined: A dataframe with different structural and sequence scores.
         Returns:
-            df_results: A dataframe containg Correlation(Spearman and Pearson) and RMSD values for the scores of the given columns.
+            df_results: A dataframe containg Correlation(Spearman and Pearson), RMSD values, mantel_corr and mantel_p_value.
         """
-        df_combined = df_combined[columns].apply(pd.to_numeric)
-        spearman_corr = df_combined[columns[0]].corr(df_combined[columns[1]], method='spearman')
-        pearson_corr = df_combined[columns[0]].corr(df_combined[columns[1]], method='pearson')
-        rmsd = ((df_combined[columns[0]] - df_combined[columns[1]]) ** 2).mean() ** 0.5
+        df_combined = df_combined.apply(pd.to_numeric)
+        spearman_corr = df_combined["score_struct_log10"].corr(df_combined["score_seq_log10"], method='spearman')
+        pearson_corr = df_combined["score_struct_log10_z-scores"].corr(df_combined["score_seq_log10_z-scores"], method='pearson')
+        # rmsd requires similarity scores and not distance scores -> 1 - distance
+        df_combined["score_struct_log10_sim"] = -df_combined["score_struct_log10"]
+        df_combined["score_seq_log10_sim"] = -df_combined["score_seq_log10"]
+        rmsd = ((df_combined["score_struct_log10_sim"] - df_combined["score_seq_log10_sim"]) ** 2).mean() ** 0.5
+        dist_mat_struct = self._convert_df_to_distance_matrix(df_combined, "score_struct_log10")
+        dist_mat_seq = self._convert_df_to_distance_matrix(df_combined, "score_seq_log10")
+        mantel_corr, mantel_p_value, _ = mantel(dist_mat_struct, dist_mat_seq, method='spearman', permutations=999)
         df_results = pd.DataFrame({
             'spearman_correlation': [spearman_corr],
             'pearson_correlation': [pearson_corr],
-            'rmsd': [rmsd]
+            'rmsd': [rmsd],
+            'mantel_correlation': [mantel_corr],
+            'mantel_p_value': [mantel_p_value]
         })
         return df_results
     
     
-    def _compare_graphs(self, G_1, G_2):
+    def _convert_df_to_distance_matrix(self, df_with_scores: pd.DataFrame, score_col: str) -> DistanceMatrix:
         """
-        Compares the graphs inferred from the structural clans file with the graphs inferred from the sequence clans file.
+        Converts a DataFrame with pairwise scores into a distance matrix.
+        Args:
+            df (pd.DataFrame): DataFrame containing columns [PDBchain1, PDBchain2, score]
+            score_col (str): The name of the column containing the scores.
+        Returns:
+            DistanceMatrix: A DistanceMatrix object representing the distance matrix.
+        """
+        structures = sorted(set(df_with_scores["PDBchain1"]).union(df_with_scores["PDBchain2"]))
+        n = len(structures)
+        df = pd.DataFrame(np.zeros((n, n)), index=structures, columns=structures)
+        for _, row in df_with_scores.iterrows():
+            i = row["PDBchain1"]
+            j = row["PDBchain2"]
+            df.loc[i, j] = row[score_col]
+            df.loc[j, i] = row[score_col]
+        np.fill_diagonal(df.values, 0)
+        mat = DistanceMatrix(df.to_numpy())
+        return mat
+    
+    
+    def _compare_graphs(self, G_1: nx.Graph, G_2: nx.Graph) -> pd.DataFrame:
+        """
+        Compares 2 given graphs.
         Returns a dataframe with the comparison results.
+        Args:
+            G_1 (networkx.Graph): The first graph to compare.
+            G_2 (networkx.Graph): The second graph to compare.
+        Returns:
+            list: A list containing dataframes with the comparison results for each graph.
         """
-        
-        raise NotImplementedError("Graph comparison not implemented yet.")
+        results = []
+        for G in [G_1, G_2]:
+            metrics = self._compute_graph_metrics(G)
+            results.append(metrics)
+        return pd.DataFrame(results)
+            
+    
+    def _compute_graph_metrics(self, G: nx.Graph) -> dict:
+        """
+        Computes various graph metrics for the given graph G.
+        Returns a dictionary with the computed metrics.
+        Args:
+            G (networkx.Graph): The input graph.
+        Returns:
+            dict: A dictionary containing various graph metrics.
+        """
+        deg_per_node = dict(nx.degree(G))
+        clustering_per_node = nx.clustering(G)
+        betweenness_per_node = nx.betweenness_centrality(G)
+        connected_components_lst = list(nx.connected_components(G))
+    
+        metrics = {
+            "num_nodes": G.number_of_nodes(),
+            "num_edges": G.number_of_edges(),
+            "avg_degree": sum(deg_per_node.values()) / len(deg_per_node),
+            "max_degree": max(deg_per_node.values()),
+            "avg_clustering": sum(clustering_per_node.values()) / len(clustering_per_node),
+            "avg_betweenness": sum(betweenness_per_node.values()) / len(betweenness_per_node),
+            "num_connected_components": nx.number_connected_components(G),
+            "average_shortest_path_length": nx.average_shortest_path_length(G)
+        }
+        return metrics
     
 
     def _build_graph_from_scores(self, df, coords_df):
@@ -396,18 +483,68 @@ class ScoresEvaluator:
         return G
     
     
-    def _compare_clusters(self, struct_clans_file: ClansFile, seq_clans_file: ClansFile):
+    def _get_cluster_labels(self, coordinates_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Compares the clusters inferred from the structural clans file with the clusters inferred from the sequence clans file.
-        Returns a dataframe with the comparison results.
+        Finds cluster labels with the coordiantes_df containing the coordinates for the structure and sequence-based clans file.
+        This method uses DBSCAN to find labels.
+        Args:
+            coordinates_df (pd.DataFrame): A DataFrame containing normalized x, y and z coordinates for each PDBchain for the structure and sequence-based clans file.
+        Returns:
+            pd.DataFrame: A DataFrame containing the cluster labels for each PDBchain for the structure and sequence-based clans file.
         """
-        raise NotImplementedError("Cluster comparison not implemented yet.")
+        coords_struct = coordinates_df[["x_struct_z-scores", "y_struct_z-scores", "z_struct_z-scores"]]
+        coords_seq = coordinates_df[["x_seq_z-scores", "y_seq_z-scores", "z_seq_z-scores"]]
+        db_struct = DBSCAN(eps=10.0, min_samples=2).fit(coords_struct)
+        db_seq = DBSCAN(eps=10.0, min_samples=2).fit(coords_seq)
+        coordinates_df["cluster_label_struct"] = db_struct.labels_
+        coordinates_df["cluster_label_seq"] = db_seq.labels_
+        return coordinates_df
     
     
-    def _get_merged_scores_and_cooridinates_df(self, struct_clans_file: ClansFile, seq_clans_file: ClansFile):
+    def _compute_cluster_overlap(self, structures_with_labels: pd.DataFrame) -> pd.DataFrame:
         """
-        Merges the scores of the structural clans file with the scores of the sequence clans file.
-        Returns a dataframe with the merged scores.
+        Computes the overlap between clusters found with structure-based coordinates and sequence-based coordinates.
+        Args:
+            structures_with_labels (pd.DataFrame): A DataFrame containing the cluster labels for each structure for the structural and sequence-based clans file.
+        Returns:
+            pd.DataFrame: A DataFrame containing the overlap metrics between structure-based and sequence-based clusters (Jaccard index, number of overlapping structures, etc.).
+        """
+        # create dict with keys as cluster labels and values as sets of structures
+        labels_struct = structures_with_labels["cluster_label_struct"].unique()
+        labels_seq = structures_with_labels["cluster_label_seq"].unique()
+        # label -1 in DBSCAN means noise
+        labels_struct = [l for l in labels_struct if l != -1]
+        labels_seq = [l for l in labels_seq if l != -1]
+        label_to_structures_struct = {}
+        label_to_structures_seq = {}
+        for label_i in labels_struct:
+            structures = set(structures_with_labels[structures_with_labels["cluster_label_struct"] == label_i]["PDBchain1"])
+            label_to_structures_struct[label_i] = structures    
+        for label_j in labels_seq:
+            structures = set(structures_with_labels[structures_with_labels["cluster_label_seq"] == label_j]["PDBchain1"])
+            label_to_structures_seq[label_j] = structures
+        # compute overlap between each pair of clusters
+        overlap_results = []
+        for label_struct, structures_struct in label_to_structures_struct.items():
+            for label_seq, structures_seq in label_to_structures_seq.items():
+                intersection = structures_struct & structures_seq
+                union = structures_struct | structures_seq
+                jacc = len(intersection) / len(union) if len(union) else 0
+                overlap_results.append({
+                    "cluster_struct": label_struct,
+                    "cluster_seq": label_seq,
+                    "num_structures_struct": len(structures_struct),
+                    "num_structures_seq": len(structures_seq),
+                    "num_overlap": len(intersection),
+                    "num_union": len(union),
+                    "jaccard_index": jacc
+                })
+        return pd.DataFrame(overlap_results) 
+    
+    
+    def _get_combined_scores_and_coordinates_df(self, struct_clans_file: ClansFile, seq_clans_file: ClansFile):
+        """
+        Combines the scores of the structural clans file and the scores of the sequence clans file in one DataFrame.
         Args:
             struct_clans_file: A ClansFile object containing the structural scores.
             seq_clans_file: A ClansFile object containing the sequence scores.
@@ -520,7 +657,7 @@ class ScoresEvaluator:
         return paths_to_cleaned_datasets
 
 
-    def _download_pdbs(self, path_to_datasets: str, out_dir: str, datasets_file_type: InputFileType) -> dict:
+    def _download_structures(self, path_to_datasets: str, out_dir: str, datasets_file_type: InputFileType) -> dict:
         """
         Downloads structure files for the datasets.
         For each dataset, the corresponding structure files are downloaded in a separated directory in the self.structures_dir.
