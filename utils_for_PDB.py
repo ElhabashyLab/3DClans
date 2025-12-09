@@ -155,6 +155,7 @@ def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir:
         dict: Containing downloaded uids together with their regions.
     """    
     reset_dir_content(output_dir)
+    print(f"Downloading structure files in \"/{output_dir}\"...")
     if input_file_type is InputFileType.FASTA:
         return process_fasta_file(input_file_path, output_dir)
     elif input_file_type is InputFileType.TSV:

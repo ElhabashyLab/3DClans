@@ -110,7 +110,7 @@ class ScoresEvaluator:
             parsed_seq_clans_file = ClansFileGenerator.parse_clans_file(seq_clans_file)
             
             # computing metrics
-            scores_combined_df, coordinates_combined_df = self._prepare_scores(parsed_struct_clans_file, parsed_seq_clans_file)
+            scores_combined_df, coordinates_combined_df = self._prepare_scores_and_coordinates(parsed_struct_clans_file, parsed_seq_clans_file)
             print(scores_combined_df)
             print(coordinates_combined_df)
             
@@ -129,27 +129,29 @@ class ScoresEvaluator:
             
             # cluster evaluation
             coord_and_cluster_labels_combined_df = self._get_cluster_labels(coordinates_combined_df)
-            print(coord_and_cluster_labels_combined_df)
-            ari = adjusted_rand_score(coord_and_cluster_labels_combined_df["cluster_label_struct"], coord_and_cluster_labels_combined_df["cluster_label_seq"])
-            nmi = normalized_mutual_info_score(coord_and_cluster_labels_combined_df["cluster_label_struct"], coord_and_cluster_labels_combined_df["cluster_label_seq"])
-            coord_struct_z_score = coord_and_cluster_labels_combined_df[["x_struct_z-scores", "y_struct_z-scores", "z_struct_z-scores"]]
-            coord_seq_z_score = coord_and_cluster_labels_combined_df[["x_seq_z-scores", "y_seq_z-scores", "z_seq_z-scores"]]
-            mtx1, mtx2, disparity = procrustes(coord_seq_z_score, coord_struct_z_score)
+            cluster_labels_df = coord_and_cluster_labels_combined_df[["PDBchain1", "cluster_label_struct", "cluster_label_seq"]]
+            ari = adjusted_rand_score(cluster_labels_df["cluster_label_struct"], cluster_labels_df["cluster_label_seq"])
+            nmi = normalized_mutual_info_score(cluster_labels_df["cluster_label_struct"], cluster_labels_df["cluster_label_seq"])
+            coord_struct_z_scored = coord_and_cluster_labels_combined_df[["x_struct_z-scores", "y_struct_z-scores", "z_struct_z-scores"]]
+            coord_seq_z_scored = coord_and_cluster_labels_combined_df[["x_seq_z-scores", "y_seq_z-scores", "z_seq_z-scores"]]
+            mtx1, mtx2, disparity = procrustes(coord_seq_z_scored, coord_struct_z_scored)
             df_cluster_comparison = pd.DataFrame({"ari": [ari], "nmi": [nmi], "procrustes_disparity": [disparity]})
-            cluster_overlap_df = self._compute_cluster_overlap(coord_and_cluster_labels_combined_df[["PDBchain1", "cluster_label_struct", "cluster_label_seq"]])
+            df_metrics_per_cluster, df_cluster_overlap = self._compare_clusters(scores_combined_df, cluster_labels_df)
+            print(cluster_labels_df)
             print(df_cluster_comparison)
-            print(cluster_overlap_df)
+            print(df_metrics_per_cluster)
+            print(df_cluster_overlap)
         
         print("Evaluation completed.")
         return evaluation_results, figures
         
         
-    def display_evaluation_results(self, df_numerical_comparisons, figures):
+    def display_evaluation_results(self, results_per_dataset, figures):
         print("Scatterplots: ")
         for fig in figures:
             fig
         print("Numerical comparison results:")
-        print(df_numerical_comparisons)
+        print(results_per_dataset)
         # add further results here:    
     
     
@@ -212,19 +214,16 @@ class ScoresEvaluator:
             self.dataset_generator.generate(size, n_cl, seeds, f"{dataset_name}.fasta")
             
     
-    def _prepare_scores(self, struct_clans_file: ClansFile, seq_clans_file: ClansFile) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def _prepare_scores_and_coordinates(self, struct_clans_file: ClansFile, seq_clans_file: ClansFile) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Prepares the scores of parsed clans file for further analyis. On of the Clans files should contain structural scores and the other sequence-based scores.
-        It merges the scores into one DataFrame,
-        log-transforms and normalizes the scores (min-max-scaling and z-scores are computed).
+        Prepares the scores and coordinates dataframes for comparison by log-transforming and normalizing the scores and normalizing the coordinates.
 
         Args:
             struct_clans_file (ClansFile): A ClansFile Object based on structural similarity.
             seq_clans_file (ClansFile): A ClansFIle Object based on sequence similarity.
 
         Returns:
-            pd.DataFrame: A DataFrame containing the original scores of both ClansFiles,
-            log-transformed scores, min-max scaled-scores and z-scores and a DataFrame containing the coordinates for each PDBchain.
+            tuple[pd.DataFrame, pd.DataFrame]: A tuple containing two DataFrames: the combined scores DataFrame and the combined coordinates DataFrame.
         """
         scores_combined_df, coordinates_combined_df = self._get_combined_scores_and_coordinates_df(struct_clans_file, seq_clans_file)
         scores_combined_df = self._log_transform(scores_combined_df, ["score_struct", "score_seq"])
@@ -444,7 +443,6 @@ class ScoresEvaluator:
         clustering_per_node = nx.clustering(G)
         betweenness_per_node = nx.betweenness_centrality(G)
         connected_components_lst = list(nx.connected_components(G))
-    
         metrics = {
             "num_nodes": G.number_of_nodes(),
             "num_edges": G.number_of_edges(),
@@ -464,7 +462,7 @@ class ScoresEvaluator:
 
         Args:
             df (pd.DataFrame): DataFrame containing columns f.e. [PDBchain1, PDBchain2, score]
-            coords_df (pd.DataFrame): DataFrame containing columns [PDBchain, x, y, z]
+            coords_df (pd.DataFrame): DataFrame containing columns [PDBchain1, x, y, z]
 
         Returns:
             networkx.Graph: Graph where nodes represent PDB chains and edges represent pairwise scores.
@@ -488,9 +486,9 @@ class ScoresEvaluator:
         Finds cluster labels with the coordiantes_df containing the coordinates for the structure and sequence-based clans file.
         This method uses DBSCAN to find labels.
         Args:
-            coordinates_df (pd.DataFrame): A DataFrame containing normalized x, y and z coordinates for each PDBchain for the structure and sequence-based clans file.
+            coordinates_df (pd.DataFrame): A DataFrame containing normalized x, y and z coordinates for each structure for the structure and sequence-based clans file.
         Returns:
-            pd.DataFrame: A DataFrame containing the cluster labels for each PDBchain for the structure and sequence-based clans file.
+            pd.DataFrame: A DataFrame containing the cluster labels for each structure for the structure and sequence-based clans file.
         """
         coords_struct = coordinates_df[["x_struct_z-scores", "y_struct_z-scores", "z_struct_z-scores"]]
         coords_seq = coordinates_df[["x_seq_z-scores", "y_seq_z-scores", "z_seq_z-scores"]]
@@ -501,29 +499,87 @@ class ScoresEvaluator:
         return coordinates_df
     
     
-    def _compute_cluster_overlap(self, structures_with_labels: pd.DataFrame) -> pd.DataFrame:
+    def _map_cluster_label_to_structures(self, structures_with_labels: pd.DataFrame, label_col: str, structure_col: str) -> dict:
+        """
+        Maps cluster labels to the structures belonging to each cluster.
+        Args:
+            structures_with_labels (pd.DataFrame): A DataFrame containing the cluster labels for each structure.
+                                                    columns = [structure, cluster_label]
+            label_col (str): The name of the column containing the cluster labels.
+            structure_col (str): The name of the column containing the structure identifiers.
+        Returns:
+            dict: A dictionary mapping each cluster label to a set of structures belonging to that cluster.
+        """
+        label_to_structures = {}
+        labels = structures_with_labels[label_col].unique()
+        labels = [l for l in labels if l != -1]  # exclude noise label (-1)
+        for label in labels:
+            structures = set(structures_with_labels[structures_with_labels[label_col] == label][structure_col])
+            label_to_structures[label] = structures
+        return label_to_structures
+    
+    
+    def _compare_clusters(self, scores_combined: pd.DataFrame, structures_with_labels: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Compares clusters found with structure-based coordinates and sequence-based coordinates.
+
+        Args:
+            scores_combined (pd.DataFrame): A DataFrame containing pairwise scores with columns = ["PDBchain1", "PDBchain2", "score_struct", "score_seq"].
+            structures_with_labels (pd.DataFrame): A DataFrame containing the cluster labels for each structure with columns = ["PDBchain1", "cluster_label_struct", "cluster_label_seq"].
+
+        Returns:
+            tuple[pd.DataFrame, pd.DataFrame]: A tuple containing two DataFrames: metrics per cluster and cluster overlap.
+        """
+        struct_scores = scores_combined[["PDBchain1", "PDBchain2", "score_struct"]].rename(columns={"score_struct": "score"})
+        seq_scores = scores_combined[["PDBchain1", "PDBchain2", "score_seq"]].rename(columns={"score_seq": "score"})
+        label_to_structures_struct = self._map_cluster_label_to_structures(structures_with_labels, "cluster_label_struct", "PDBchain1")
+        label_to_structures_seq = self._map_cluster_label_to_structures(structures_with_labels, "cluster_label_seq", "PDBchain1")
+        df_cluster_overlap = self._compute_cluster_overlap(label_to_structures_struct, label_to_structures_seq)
+        df_cluster_metrics_struct = self._compute_metrics_per_cluster(struct_scores, label_to_structures_struct)
+        df_cluster_metrics_seq = self._compute_metrics_per_cluster(seq_scores, label_to_structures_seq)
+        df_cluster_metrics_struct["cluster_label"] = (df_cluster_metrics_struct["cluster_label"].astype(str) + "_struct")
+        df_cluster_metrics_seq["cluster_label"] = (df_cluster_metrics_seq["cluster_label"].astype(str) + "_seq")
+        df_metrics_per_cluster = pd.concat(
+            [df_cluster_metrics_struct, df_cluster_metrics_seq],
+            axis=0,
+            ignore_index=True
+        )
+        return df_metrics_per_cluster, df_cluster_overlap
+    
+    
+    def _compute_metrics_per_cluster(self, pairwise_scores: pd.DataFrame, label_to_structures: dict) -> pd.DataFrame:
+        """
+        Computes metrics for each cluster based on the pairwise_scores DataFrame.
+        Args:
+            pairwise_scores (pd.DataFrame): A DataFrame containing pairwise scores with columns = ["PDBchain1", "PDBchain2", "score"].
+            label_to_structures (dict): A dictionary mapping cluster labels to sets of structures.
+        Returns:
+            pd.DataFrame: A DataFrame containing metrics for each cluster.
+        """
+        cluster_metrics = []
+        for label, structures in label_to_structures.items():
+            # get possible pairs within the cluster
+            scores_of_cluster = pairwise_scores[pairwise_scores["PDBchain1"].isin(structures) & pairwise_scores["PDBchain2"].isin(structures)]
+            cluster_metrics.append({
+                "cluster_label": label,
+                "num_structures": len(structures),
+                "mean_score": scores_of_cluster["score"].mean(),
+                "median_score": scores_of_cluster["score"].median(),
+                "std_score": scores_of_cluster["score"].std()
+            })
+        return pd.DataFrame(cluster_metrics)
+    
+    
+    def _compute_cluster_overlap(self, label_to_structures_struct: dict, label_to_structures_seq: dict) -> pd.DataFrame:
         """
         Computes the overlap between clusters found with structure-based coordinates and sequence-based coordinates.
         Args:
             structures_with_labels (pd.DataFrame): A DataFrame containing the cluster labels for each structure for the structural and sequence-based clans file.
+                                                    columns = [structure, cluster_label_struct, cluster_label_seq]
         Returns:
-            pd.DataFrame: A DataFrame containing the overlap metrics between structure-based and sequence-based clusters (Jaccard index, number of overlapping structures, etc.).
+            pd.DataFrame: A DataFrame containing the overlap metrics between structure-based and sequence-based clusters
+            [cluster_label_struct, cluster_label_seq, num_structures_struct, num_structures_seq, num_overlap, num_union, jaccard_index].
         """
-        # create dict with keys as cluster labels and values as sets of structures
-        labels_struct = structures_with_labels["cluster_label_struct"].unique()
-        labels_seq = structures_with_labels["cluster_label_seq"].unique()
-        # label -1 in DBSCAN means noise
-        labels_struct = [l for l in labels_struct if l != -1]
-        labels_seq = [l for l in labels_seq if l != -1]
-        label_to_structures_struct = {}
-        label_to_structures_seq = {}
-        for label_i in labels_struct:
-            structures = set(structures_with_labels[structures_with_labels["cluster_label_struct"] == label_i]["PDBchain1"])
-            label_to_structures_struct[label_i] = structures    
-        for label_j in labels_seq:
-            structures = set(structures_with_labels[structures_with_labels["cluster_label_seq"] == label_j]["PDBchain1"])
-            label_to_structures_seq[label_j] = structures
-        # compute overlap between each pair of clusters
         overlap_results = []
         for label_struct, structures_struct in label_to_structures_struct.items():
             for label_seq, structures_seq in label_to_structures_seq.items():
@@ -531,8 +587,8 @@ class ScoresEvaluator:
                 union = structures_struct | structures_seq
                 jacc = len(intersection) / len(union) if len(union) else 0
                 overlap_results.append({
-                    "cluster_struct": label_struct,
-                    "cluster_seq": label_seq,
+                    "cluster_label_struct": label_struct,
+                    "cluster_label_seq": label_seq,
                     "num_structures_struct": len(structures_struct),
                     "num_structures_seq": len(structures_seq),
                     "num_overlap": len(intersection),
