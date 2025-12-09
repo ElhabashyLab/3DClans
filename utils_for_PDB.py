@@ -155,7 +155,7 @@ def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir:
         dict: Containing downloaded uids together with their regions.
     """    
     reset_dir_content(output_dir)
-    print(f"Downloading structure files in \"/{output_dir}\"...")
+    print(f"Downloading structure files in \"{output_dir}\"...")
     if input_file_type is InputFileType.FASTA:
         return process_fasta_file(input_file_path, output_dir)
     elif input_file_type is InputFileType.TSV:
@@ -353,7 +353,7 @@ def get_meta_data_of_structure_file(path_to_protein: str) -> list[str]:
     return header_lines
 
 
-def download_fasta_record(uid: str) -> SeqRecord | bool:
+def download_fasta_record(uid: str, region: list[int] | None = None) -> SeqRecord | bool:
     """
     Download a UniProt FASTA record by accession. If it is not available, try UniParc.
 
@@ -364,9 +364,10 @@ def download_fasta_record(uid: str) -> SeqRecord | bool:
         bool: False if download failed.
     """
     # URLs for UniProt and UniParc
-    uniprot_url = f"https://rest.uniprot.org/uniprotkb/{uid}.fasta"
-    uniparc_url = f"https://rest.uniprot.org/uniparc/{uid}.fasta"
-    for url in [uniprot_url, uniparc_url]:
+    uniprot_api_url = f"https://rest.uniprot.org/uniprotkb/{uid}.fasta"
+    upi = uid # upi is needed for uniparc
+    uniparc__api_url = f"https://rest.uniprot.org/uniparc/{upi}.fasta"
+    for url in [uniprot_api_url, uniparc__api_url]:
         try:
             response = requests.get(url, timeout=10)
             if response.status_code == 200 and response.text.startswith(">"):
@@ -400,7 +401,7 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
     else:
         records = []
         for uid, region in uids_with_regions.items():
-            downloaded_record = download_fasta_record(uid)
+            downloaded_record = download_fasta_record(uid, region)
             if isinstance(downloaded_record, SeqRecord):
                 record_with_region = add_region_to_record(downloaded_record, region)
                 records.append(record_with_region)
