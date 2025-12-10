@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(".."))
 from Dataset_Generator.DatasetGenerator import DatasetGenerator
-from old_clans.utils_old_clans import run_clans_headless
+from recovered_CLANS.utils_old_clans import run_clans_headless
 from utils_for_PDB import copy_dir_content, reset_dir_content, generate_fasta_from_uids_with_regions, fetch_pdbs
 from StructSimComputer import StructSimComputer
 from ClansFileGenerator import ClansFileGenerator
@@ -84,12 +84,13 @@ class ScoresEvaluator:
         scores_for_each_dataset = self._compute_struct_scores(self.structures_dir)
         self._compute_struct_clans_files(scores_for_each_dataset, paths_to_cleaned_datasets)
         
-        print("Running recovered clans.jar on the generated structural clans files...")
+        print("Running recovered clans.jar on  structural clans files...")
         input_output_dict_structural = self._generate_input_output_files_dict(self.clans_files_structsim_dir, self.clans_files_structsim_dir)
         run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type=InputFileType.CLANS, rounds=rounds_to_cluster)
         
-        print("Running recovered clans.jar with fasta files (using sequence similarity)...")
+        print("Running recovered clans.jar on sequence-based clans files...")
         input_output_dict_sequence = self._generate_input_output_files_dict(self.datasets_dir, self.clans_files_seqsim_dir)
+        # running old clans using the cleaned fasta files
         run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type=InputFileType.FASTA, blast_dir=self.blast_dir, clans_generator=self.seq_clans_generator, rounds=rounds_to_cluster)
         print("Evaluation initialized. Clans files generated and clustered for each dataset with structure similarity scores and sequence similarity scores.")
         return self._match_clans_files_for_comparison(self.clans_files_structsim_dir, self.clans_files_seqsim_dir)

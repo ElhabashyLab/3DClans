@@ -10,14 +10,14 @@ In this file the performance of different alignment tools of protein structures 
     - US-align
     - TM-align
     - Foldseek
-This is done by running the tools on a predefined set of protein structure as fasta/tsv or folders with PDB files
-and measuring the time taken for each tool with a timer.
+This is done by running the code of `benchmark_tool_speed.py` on a predefined set of protein structures in a folder
+or by supplying a valid input-file. The Benchmark measures and records the time taken for each tool.
 """
 
 class Benchmark:
     def __init__(self, input_file=None, input_file_type=None, run_with_structures_for_benchmark=True):
         """
-        Sets up the benchmark environment by downloading protein structure files from a given FASTA file or tsv file.
+        Sets up the benchmark environment by downloading protein structure files from a given input-file.
         If 'run_with_structures_for_benchmark' is False, the 'input_file' is mandatory, and it will overwrite the protein structure files
         in the structures_for_benchmark directory. In this case it is also mandatory to specify the 'input_file_type'. 
         If 'run_with_structures_for_benchmark' is True, it will run the benchmark with already downloaded protein structure files.
@@ -68,6 +68,6 @@ class Benchmark:
 
 
 # test
-input_file = "./example_files/small_tsv_files/test_2.tsv"
+input_file = "./example_files/small_tsv_files/test_1.tsv"
 benchmark = Benchmark(input_file=input_file, input_file_type=InputFileType.TSV, run_with_structures_for_benchmark=False)
 results = benchmark.run_benchmark()
