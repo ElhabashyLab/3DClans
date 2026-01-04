@@ -107,7 +107,9 @@ def extract_uid_from_recordID(record_id):
     :return: the extracted UniProt ID
     """
     if "|" in record_id:
-            uid = record_id.split("|")[1].split(".")[0]
+        uid = record_id.split("|")[1].split(".")[0]
+    elif "_" in record_id:
+        uid = record_id.split("_")[0].split(".")[0]
     else:
         # if no '|' is found in header, the header is assumed to be the uid
         uid = record_id.split(".")[0]
@@ -225,7 +227,7 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
     return uids_with_regions
 
 
-def download_alphafold_structure(uid: str, output_dir: str, region: list[int] | None, file_format: str = "pdb") -> bool:
+def download_alphafold_structure_2(uid: str, output_dir: str, region: list[int] | None, file_format: str = "pdb") -> bool:
     """
     Downloads the AlphaFold structure of a given protein and saves it in the output_dir.
     If region is provided, the protein is cut to the specified region.
@@ -244,6 +246,68 @@ def download_alphafold_structure(uid: str, output_dir: str, region: list[int] | 
     if success and region:
         extract_region_of_protein(path_to_structure, file_format, region, path_to_structure) # overwrites path_to_structure
     return success
+
+
+def download_alphafold_structure(
+    id: str,
+    output_dir: str,
+    region: list[int] | None,
+    file_format: str = "pdb",
+) -> bool:
+    """
+    Downloads the AlphaFold-predicted structure for a given structure-ID (f.e. Uniprot-ID) and saves it
+    to the specified output directory. If a residue region is provided, the structure
+    is truncated to that region after download.
+    The structure URL is obtained via the official AlphaFold DB REST API.
+
+    Args:
+        id (str): accession-id of the structure.
+        output_dir (str): Directory where the structure file will be saved.
+        region (list[int] | None): Residue range [start, end] to extract (1-based, inclusive).
+        file_format (str): Structure format to download ("pdb" or "cif").
+
+    Returns:
+        bool: True if the structure was successfully downloaded (and processed),
+              False otherwise.
+    """
+    if file_format not in {"pdb", "cif"}:
+        raise ValueError("file_format must be 'pdb' or 'cif'")
+    
+    api_url = f"https://alphafold.ebi.ac.uk/api/prediction/{id}"
+    try:
+        response = requests.get(api_url, timeout=30)
+        response.raise_for_status()
+        predictions = response.json()
+    except Exception:
+        print(f"Failed to download {id} from {api_url}")
+        return False
+    if not predictions:
+        print(f"Failed to download {id} from {api_url}")
+        return False
+    
+    model_info = predictions[0]
+    if file_format == "pdb":
+        structure_url = model_info.get("pdbUrl")
+    else:
+        structure_url = model_info.get("cifUrl")
+    if not structure_url:
+        print(f"Failed to download {id} from {api_url}")
+        return False
+
+    path_to_structure = os.path.join(output_dir, f"{id}.{file_format}")
+    success = download_file(structure_url, path_to_structure)
+    if not success:
+        print(f"Failed to download {id} from {api_url}")
+        return False
+
+    if region:
+        extract_region_of_protein(
+            path_to_structure,
+            file_format,
+            region,
+            path_to_structure,
+        )
+    return True
     
 
 def extract_region_of_protein(path_to_protein: str, file_type: str, region: list[int], output_path = None):
