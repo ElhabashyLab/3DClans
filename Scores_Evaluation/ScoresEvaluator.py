@@ -32,9 +32,9 @@ class ScoresEvaluator:
     
     Order of method calls for evaluation:
     1. __init__: Initialize the ScoresEvaluator with necessary parameters.
-    2. _initialize_evaluation: provide or generate the data, compute scores, and generate clans files.
+    2. initialize_evaluation: provide or generate the data, compute scores, generate and cluster the clans files.
     3. evaluate: Perform the evaluation on the generated clans files and return the results.
-    4. _display_evaluation_results: Display the evaluation results including plots and dataframes
+    4. display_evaluation_results: Display the evaluation results including plots and dataframes
     """
     def __init__(self, path_to_recovered_clans: str):
         """
@@ -59,15 +59,17 @@ class ScoresEvaluator:
     def initialize_evaluation(self,
                               rounds_to_cluster: int,
                               datasets_meta_data: Optional[dict] = None,
-                              use_existing_dataset: bool = False,
+                              use_existing_datasets: bool = False,
                               path_to_dir_of_existing_datasets: Optional[str] = None,
                               datasets_file_type: InputFileType = InputFileType.FASTA
                               ) -> dict:
         """
-        Generates or uses existing datasets.
-        Downloads the corresponding PDB files of the datasets, computes structure similarity scores and creates clans files from those.
-        After, it runs the old recovered clans 'rounds_to_cluster'-times on the generated clans files and saves the updated clans files.
+        Sets up the datasets for evaluation with exisiting data or generating new datasets.
+        If new datasets are generated, the datasets_meta_data must be provided.
+        Generates structural clans files and sequence clans files for each dataset.
+        Clusters the clans files with recovered clans.jar.
         This function should be called before running the actual evaluation.
+        
         Args:
             rounds_to_cluster: Number of rounds to use for clustering in recovered clans.
             datasets_meta_data: A dictionary containing for each dataset; size_of_dataset (int), number of clusters (int) and seeds (list of str).
@@ -75,22 +77,53 @@ class ScoresEvaluator:
             path_to_dir_of_existing_datasets: Path to existing datasets if use_existing_dataset is True.
             datasets_file_type: The type of the dataset files in the existing datasets. If None, FASTA is assumed.
         Retruns:
-            dict: A dictionary mapping structural clans file paths to sequence clans file paths.
+            dict: A dictionary mapping clustered structural clans file paths to clustered sequence clans file paths.
         """
         print("Initializing evaluation...")
-        self._set_up_datasets_dir(use_existing_dataset, path_to_dir_of_existing_datasets, datasets_meta_data)
+        self.set_up_datasets(use_existing_datasets, path_to_dir_of_existing_datasets, datasets_meta_data)
+        self.generate_clans_files(datasets_file_type)
+        structural_to_sequence_clans_files = self.cluster_clans_files(rounds_to_cluster)
+        return structural_to_sequence_clans_files
+
+
+    def set_up_datasets(self, use_existing_datasets, path_to_dir_of_existing_datasets, datasets_meta_data):
+        """
+        Generates datasets with the given datasets_meta_data in self.datasets_dir.
+        If use_existing_dataset is True, it copys the content of the folder of existing datasets to self.datasets_dir.
+
+        Args:
+            use_existing_datasets (bool): Whether to use an existing dataset directory.
+            path_to_dir_of_existing_datasets (str): Path to existing datasets if use_existing_datasets is True.
+            datasets_meta_data (dict): Metadata for generating datasets if not using existing datasets.
+
+        Raises:
+            ValueError: If use_existing_datasets is True but no path is provided.
+        """
+        if use_existing_datasets:
+            if path_to_dir_of_existing_datasets is None:
+                raise ValueError("Path to existing datasets must be provided if use_existing_datasets is True.")
+            copy_dir_content(path_to_dir_of_existing_datasets, self.datasets_dir)
+        else:
+            if datasets_meta_data is None:
+                raise ValueError("Datasets metadata must be provided if not using existing datasets.")
+            self._generate_datasets(datasets_meta_data)
+        
+        
+    def generate_clans_files(self, datasets_file_type: InputFileType = InputFileType.FASTA):
         uids_with_regions_for_each_dataset = self._download_structures(self.datasets_dir, self.structures_dir, datasets_file_type)
         paths_to_cleaned_datasets = self._generate_fasta_from_uids_with_regions_for_each_dataset(uids_with_regions_for_each_dataset, self.datasets_dir, datasets_file_type)
         scores_for_each_dataset = self._compute_struct_scores(self.structures_dir)
         self._compute_struct_clans_files(scores_for_each_dataset, paths_to_cleaned_datasets)
         
-        print("Running recovered clans.jar on  structural clans files...")
+        
+    def cluster_clans_files(self, rounds_to_cluster: int) -> dict:
+        print("\nRunning recovered clans.jar on structural clans files...\n")
         input_output_dict_structural = self._generate_input_output_files_dict(self.clans_files_structsim_dir, self.clans_files_structsim_dir)
         run_clans_headless(self.path_to_recovered_clans, input_output_dict_structural, input_file_type=InputFileType.CLANS, rounds=rounds_to_cluster)
         
-        print("Running recovered clans.jar on sequence-based clans files...")
+        print("\nRunning recovered clans.jar on sequence-based clans files...\n")
         input_output_dict_sequence = self._generate_input_output_files_dict(self.datasets_dir, self.clans_files_seqsim_dir)
-        # running old clans using the cleaned fasta files
+        # running old clans with pairwise sequence scores 
         run_clans_headless(self.path_to_recovered_clans, input_output_dict_sequence, input_file_type=InputFileType.FASTA, blast_dir=self.blast_dir, clans_generator=self.seq_clans_generator, rounds=rounds_to_cluster)
         print("Evaluation initialized. Clans files generated and clustered for each dataset with structure similarity scores and sequence similarity scores.")
         return self._match_clans_files_for_comparison(self.clans_files_structsim_dir, self.clans_files_seqsim_dir)
@@ -144,39 +177,7 @@ class ScoresEvaluator:
             print(df_cluster_overlap)
         
         print("Evaluation completed.")
-        return evaluation_results, figures
-        
-        
-    def display_evaluation_results(self, results_per_dataset, figures):
-        print("Scatterplots: ")
-        for fig in figures:
-            fig
-        print("Numerical comparison results:")
-        print(results_per_dataset)
-        # add further results here:    
-    
-    
-    def _set_up_datasets_dir(self, use_existing_dataset, path_to_dir_of_existing_datasets, datasets_meta_data):
-        """
-        Generates datasets with the given datasets_meta_data in self.datasets_dir.
-        If use_existing_dataset is True, it copys the content of the folder of existing datasets to self.datasets_dir.
-
-        Args:
-            use_existing_dataset (bool): Whether to use an existing dataset directory.
-            path_to_dir_of_existing_datasets (str): Path to existing datasets if use_existing_dataset is True.
-            datasets_meta_data (dict): Metadata for generating datasets if not using existing datasets.
-
-        Raises:
-            ValueError: If use_existing_dataset is True but no path is provided.
-        """
-        if use_existing_dataset:
-            if path_to_dir_of_existing_datasets is None:
-                raise ValueError("Path to existing datasets must be provided if use_existing_dataset is True.")
-            copy_dir_content(path_to_dir_of_existing_datasets, self.datasets_dir)
-        else:
-            if datasets_meta_data is None:
-                raise ValueError("Datasets metadata must be provided if not using existing datasets.")
-            self._generate_datasets(datasets_meta_data)
+        return evaluation_results, figures   
             
         
     def _set_up_dirs(self, leave_as_is: list = []):
@@ -456,29 +457,48 @@ class ScoresEvaluator:
         }
         return metrics
     
-
-    def _build_graph_from_scores(self, df, coords_df):
+    
+    def _build_graph_from_scores(self, coords_df):
         """
-        Builds a 3D graph (NetworkX) from pairwise score data and node coordinates.
+        Builds a 3D graph (NetworkX) from structures and their coordinates.
+
+        Each row in the input DataFrame corresponds to a node. Nodes are fully
+        connected with edges weighted by the Euclidean distance between their
+        3D coordinates.
 
         Args:
-            df (pd.DataFrame): DataFrame containing columns f.e. [PDBchain1, PDBchain2, score]
-            coords_df (pd.DataFrame): DataFrame containing columns [PDBchain1, x, y, z]
+            coords_df (pd.DataFrame): DataFrame containing columns
+                ['PDBchain1', 'x', 'y', 'z']
 
         Returns:
-            networkx.Graph: Graph where nodes represent PDB chains and edges represent pairwise scores.
-                            Each node has a 'pos' attribute with 3D coordinates (x, y, z).
+            networkx.Graph: Undirected graph where:
+                - nodes represent structures
+                - node attribute 'pos' contains (x, y, z)
+                - edge weight 'distance' is the Euclidean distance
         """
+        required_cols = {"PDBchain1", "x", "y", "z"}
+        missing = required_cols - set(coords_df.columns)
+        if missing:
+            raise ValueError(f"Missing required columns: {missing}")
+
         G = nx.Graph()
-        for _, row in df.iterrows():
-            G.add_edge(
-                row.iloc[0], # node_x
-                row.iloc[1], # node_y
-                weight=row.iloc[2] # edge_length
-            )
-        coords_dict = dict(zip(coords_df.iloc[:, 0], 
-                           zip(coords_df.iloc[:, 1], coords_df.iloc[:, 2], coords_df.iloc[:, 3])))
-        nx.set_node_attributes(G, coords_dict, name="pos")
+
+        # Add nodes with positions
+        for _, row in coords_df.iterrows():
+            node_id = row["PDBchain1"]
+            pos = (row["x"], row["y"], row["z"])
+            G.add_node(node_id, pos=pos)
+
+        # Pre-extract coordinates for efficiency
+        nodes = coords_df["PDBchain1"].tolist()
+        coords = coords_df[["x", "y", "z"]].to_numpy(dtype=float)
+
+        # Add weighted edges (Euclidean distance)
+        n = len(nodes)
+        for i in range(n):
+            for j in range(i + 1, n):
+                distance = np.linalg.norm(coords[i] - coords[j])
+                G.add_edge(nodes[i], nodes[j], distance=distance)
         return G
     
     

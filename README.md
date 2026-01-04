@@ -105,7 +105,7 @@ The resulting clans file will be saved in the `clans_files` directory.
 ### Examples:
 
 ```bash
-python main.py --load path/to/input.fasta --input_type fasta --tool foldseek --score evalue
+python main.py --load <path/to/input.fasta> --input_type fasta --tool foldseek --score <evalue>
 ```
 
 ### Help

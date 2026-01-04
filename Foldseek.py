@@ -24,7 +24,9 @@ class Foldseek(StructSimTool):
         self.flag_format_output = "--format-output" # flag to specify output format
         self.output_columns = self._get_output_columns_from_self_score()  # specifies the columns foldseek returns based on the needed metric (important metrics: qtmscore, ttmscore, evalue)
         self.flag_a = "-a" # enables foldseek to store alignment backtrace information (needed for TM scores)
-
+        self.exhaustive_search = "--exhaustive-search" # enables exhaustive search (slower but more accurate/skips prefiltering)
+        self.e = "-e" # e-value threshold for foldseek search
+        
 
     def _get_output_columns_from_self_score(self):
         """
