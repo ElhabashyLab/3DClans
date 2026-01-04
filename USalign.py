@@ -2,7 +2,7 @@ from StructSimTool import StructSimTool
 import os
 import pandas as pd
 from io import StringIO
-from utils_for_PDB import reset_dir_content
+from utils_for_structures_and_fasta import reset_dir_content
 
 
 class USalign(StructSimTool):

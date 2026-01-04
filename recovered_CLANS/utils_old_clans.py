@@ -3,10 +3,7 @@ import os
 import pandas as pd
 from ClansFileGenerator import ClansFileGenerator
 from InputFileType import InputFileType
-from utils_for_PDB import extract_uid_from_recordID
-
-
-# This is the path to the recovered clans project directory (github-repo: https://github.com/AronWichtner/clans-recovered.git)
+from utils_for_structures_and_fasta import extract_uid_from_recordID
 
 
 def run_clans_headless_from_c_file(recovered_clans_path: str, input_file: str, output_file: str, rounds: int = 100):
@@ -30,36 +27,51 @@ def run_clans_headless_from_c_file(recovered_clans_path: str, input_file: str, o
 def run_clans_headless_from_f_file(recovered_clans_path: str, input_file: str, output_file: str, blast_dir: str, clans_file_generator: ClansFileGenerator, rounds: int = 100):
     """
     Runs recovered clans in headless mode on the given fasta file and saves the output to the output file.
-    From the fasta file, a clans file will be created using blast, and then clans will be run on that clans file.
+    From the fasta file, a clans file will be created using blast, and then CLANS will be run on that clans file.
     Default settings for blast will be used.
     Args:
-        input_file: A path to the input fasta file
-        output_file: A path to the output clans file
-        recovered_clans_path: A path to the recovered clans project directory
-        blast_dir: A path to the directory where the blast database and results will be stored
-        rounds: The number of rounds to run clans for.
+        input_file (str): A path to the input fasta file
+        output_file (str): A path to the output clans file
+        recovered_clans_path (str): A path to the recovered clans project directory
+        blast_dir (str): A path to the directory where the blast database and results will be stored
+        rounds (int): The number of rounds to run clans for.
     Returns: None
     """
-    # get pairwise blast results from fasta file
-    input_file_name = os.path.splitext(os.path.basename(input_file))[0]
-    blast_results_path = os.path.join(blast_dir, f"{input_file_name}_blast.tsv")
-    [blast_results_path, outformat] = blast_fasta(input_file, blast_results_path, blast_dir)
+    seq_based_clans_file = generate_clans_file_seq_based(input_file, blast_dir, clans_file_generator, recovered_clans_path) 
+    run_clans_headless_from_c_file(recovered_clans_path, seq_based_clans_file, output_file, rounds)
+
+
+def generate_clans_file_seq_based(fasta_file_path: str, blast_dir_path: str, clans_file_generator: ClansFileGenerator, out_path: str) -> str:
+    """
+    Generates a clans file based on sequence similarity from the given fasta file and blast results.
+    The clans files is generated using the default parameters of the CLANS-web-tool.
+    Args:
+        fasta_file_path (str): A path to the input fasta file
+        blast_dir_path (str): A path to the directory where the blast database and results will be stored
+        clans_file_generator (ClansFileGenerator): An instance of ClansFileGenerator to generate the clans file
+        out_path (str): A path to the output directory where the clans file will be saved
+    Returns:
+        str: A path to the generated clans file
+    """
+    input_file_name = os.path.splitext(os.path.basename(fasta_file_path))[0]
+    blast_results_path = os.path.join(blast_dir_path, f"{input_file_name}_blast.tsv")
+    [blast_results_path, outformat] = blast_fasta(fasta_file_path, blast_results_path, blast_dir_path)
     blast_results_df = pd.read_csv(blast_results_path, sep="\t", names=["PDBchain1", "PDBchain2", "score"])
     blast_results_df["PDBchain1"] = blast_results_df["PDBchain1"].apply(extract_uid_from_recordID)
     blast_results_df["PDBchain2"] = blast_results_df["PDBchain2"].apply(extract_uid_from_recordID)
     blast_results_df = blast_results_df[blast_results_df['PDBchain1'] != blast_results_df['PDBchain2']] # remove self-hits
-    blast_results_df = blast_results_df.drop_duplicates(subset=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
-    clans_file_path = clans_file_generator.generate_clans_file(blast_results_df, input_file)
-    run_clans_headless_from_c_file(recovered_clans_path, clans_file_path, output_file, rounds)
+    scores_df = blast_results_df.drop_duplicates(subset=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
+    clans_file_path = clans_file_generator.generate_clans_file(scores_df, fasta_file_path)
+    return clans_file_path
 
 
 def blast_fasta(fasta_file: str, output_file: str, working_dir: str):
     """
     Runs blast on the given fasta file and saves the output to the output file.
     Args:
-        fasta_file: A path to the input fasta file
-        output_file: A path to the output blast file
-        working_dir: A path to the working directory where the blast database will be created
+        fasta_file (str): A path to the input fasta file
+        output_file (str): A path to the output blast file
+        working_dir (str): A path to the working directory where the blast database will be created
     Returns: None
     """
     tmp_db = os.path.join(working_dir, "temp_blast_db") 
@@ -75,19 +87,18 @@ def blast_fasta(fasta_file: str, output_file: str, working_dir: str):
     subprocess.run(blast_cmd, check=True)
     return [output_file, outfmt.split(" ")[1:]]
     
-    
 
 def run_clans_headless(recovered_clans_path: str, input_output_files: dict, input_file_type: InputFileType, rounds: int = 100000, blast_dir = None, clans_generator = None):
     """
     Runs recovered clans in headless mode on each of the given input files and saves the output to the corresponding output files.
-    The input_output_files dict should contain input_file: output_file pairs.
+    The input_output_files dict should contain input_file_path: output_file_path pairs.
     Args:
-        input_output_files: A dict containing input_file: output_file pairs
-        recovered_clans_path: A path to the recovered clans project directory
-        input_file_type: The type of the input files. Can be either "clans" or "fasta".
-        rounds: The number of rounds to run clans for.
-        blast_dir: A path to the directory where the blast database and results will be stored. Only needed if input_file_type is "fasta".
-        clans_generator: An optional ClansFileGenerator object to use for generating clans files from fasta files. Must be provided if input_file_type is "fasta".
+        input_output_files (dict): A dict containing input_file_path: output_file_path pairs
+        recovered_clans_path (str): A path to the recovered clans project directory
+        input_file_type (InputFileType): The type of the input files. Can be either InputFileType.CLANS or InputFileType.FASTA.
+        rounds (int): The number of rounds to run clans for.
+        blast_dir (str): A path to the directory where the blast database and results will be stored. Only needed if input_file_type is "fasta".
+        clans_generator (ClansFileGenerator): An optional ClansFileGenerator object to use for generating clans files from fasta files. Must be provided if input_file_type is "fasta".
     Returns: None
     """
     for input_file, output_file in input_output_files.items():

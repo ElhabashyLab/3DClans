@@ -2,6 +2,7 @@ from io import StringIO
 import re
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
+from Bio.Seq import MutableSeq
 from Bio.Seq import Seq
 from Bio.PDB.PDBIO import PDBIO
 from Bio.PDB.PDBParser import PDBParser
@@ -118,7 +119,7 @@ def extract_uid_from_recordID(record_id):
     return uid
 
 
-def extract_region_from_record(record) -> list | None:
+def extract_region_from_record(record) -> tuple[int, int] | None:
     """
     Extracts the numeric region of interest (start and end) from a FASTA record header.
 
@@ -132,7 +133,7 @@ def extract_region_from_record(record) -> list | None:
         record (SeqRecord): A Biopython SeqRecord object representing a FASTA entry.
 
     Returns:
-        list[int, int] | None: A list [region_start, region_end] if a valid region is found,
+        list[int, int] | None: A tuple (region_start, region_end) if a valid region is found,
                                otherwise None.
     """
     # Extract the record header (identifier)
@@ -141,16 +142,16 @@ def extract_region_from_record(record) -> list | None:
     match = re.search(r"/(\d+)-(\d+)", header)
     if match:
         start, end = map(int, match.groups())
-        return [start, end]
+        return (start, end)
     else:
         return None
 
 
-def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict:
+def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict[str, tuple[int, int] | None]:
     """
     Fetches and stores PDB files, specified in a given input_file in a output directory.
     The contents of the output dir will be overwritten.
-    It returns a dict containing {uid : [region_start, region_end]} of the sequences that have been successfully downloaded.
+    It returns a dict containing {uid : (region_start, region_end)} of the sequences that have been successfully downloaded.
     
     Args:
         input_file_path: Path to the input file.
@@ -158,7 +159,7 @@ def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir:
         output_dir: The directory where the downloaded PDBs are stored.
         
     Returns:
-        dict: Containing downloaded uids together with their regions.
+        dict (str, tuple[int, int] | None): Containing downloaded uids together with their regions.
     """    
     reset_dir_content(output_dir)
     print(f"Downloading structure files in \"{output_dir}\"...")
@@ -199,8 +200,8 @@ def process_fasta_file(input_file_path: str, output_dir: str) -> dict:
 
 def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
     """
-    Downloads the PDBs of the uids in the given tsv file.
-    It also creates a dictionary with an entry for each downloaded record. uid : [region]
+    Downloads the structures of the uids in the given tsv file.
+    It also creates a dictionary with an entry for each downloaded record. {uid : [region]}
     The tsv file should contain the columns [entry, region_start, region_end].
 
     Args:
@@ -221,7 +222,7 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
         if pd.isna(start) or pd.isna(end):
             region = None
         else:
-            region = [int(start), int(end)]
+            region = (int(start), int(end))
         if download_alphafold_structure(uid, output_dir, region):
             successful_downloads += 1
             uids_with_regions[uid] = region
@@ -232,7 +233,7 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
 def download_alphafold_structure(
     id: str,
     output_dir: str,
-    region: list[int] | None,
+    region: tuple[int, int] | None,
     file_format: str = "pdb",
 ) -> bool:
     """
@@ -244,7 +245,7 @@ def download_alphafold_structure(
     Args:
         id (str): accession-id of the structure.
         output_dir (str): Directory where the structure file will be saved.
-        region (list[int] | None): Residue range [start, end] to extract (1-based, inclusive).
+        region (tuple[int, int] | None): Residue range [start, end] to extract (1-based, inclusive).
         file_format (str): Structure format to download ("pdb" or "cif").
 
     Returns:
@@ -291,7 +292,7 @@ def download_alphafold_structure(
     return True
     
 
-def extract_region_of_protein(path_to_protein: str, file_type: str, region: list[int], output_path = None):
+def extract_region_of_protein(path_to_protein: str, file_type: str, region: tuple[int, int], output_path = None):
     """
     Extracts a specific residue range from a protein structure file (PDB or CIF)
     without corrupting metadata. Writes output to a new file by default.
@@ -299,7 +300,7 @@ def extract_region_of_protein(path_to_protein: str, file_type: str, region: list
     Args:
         path_to_protein (str): Path to the protein file.
         file_type (str): 'pdb' or 'cif'.
-        region (list[int]): [start, end] residue indices to extract.
+        region (tuple[int, int]): (start, end) residue indices to extract.
         output_path (str, optional): Path to save extracted structure. Defaults to adding '_region' suffix.
     """
     class SelectRegion(Select):
@@ -321,13 +322,13 @@ def extract_region_of_protein(path_to_protein: str, file_type: str, region: list
     return output_path
 
 
-def adapt_metadata_to_region(meta_data: list[str], region: list[int]) -> list[str]:
+def adapt_metadata_to_region(meta_data: list[str], region: tuple[int, int]) -> list[str]:
     """
     Adapts the metadata lines of a structure file to reflect the extracted region.
     
     Args:
         meta_data (list[str]): Original metadata lines.
-        region (list[int]): [start, end] residue indices.
+        region (tuple[int, int]): [start, end] residue indices.
         
     Returns:
         list[str]: Adapted metadata lines.
@@ -349,13 +350,13 @@ def adapt_metadata_to_region(meta_data: list[str], region: list[int]) -> list[st
     return adapted_lines
 
 
-def handle_DBREF_line(line: str, region: list[int]) -> str:
+def handle_DBREF_line(line: str, region: tuple[int, int]) -> str:
     """
     Adapts a DBREF line to reflect the extracted region.
     
     Args:
         line (str): Original DBREF line.
-        region (list[int]): [start, end] residue indices.
+        region (tuple[int, int]): [start, end] residue indices.
         
     Returns:
         str: Adapted DBREF line.
@@ -400,7 +401,7 @@ def get_meta_data_of_structure_file(path_to_protein: str) -> list[str]:
     return header_lines
 
 
-def download_fasta_record(uid: str, upi=None, region: list[int] | None = None) -> SeqRecord | bool:
+def download_fasta_record(uid: str, upi=None, region: tuple[int, int] | None = None) -> SeqRecord | bool:
     """
     Download a FASTA record by accession from Uniprot and as a fallback from UniParc.
     If the record is downloaded from UniParc the initial uid is used as accession-id.
@@ -408,6 +409,8 @@ def download_fasta_record(uid: str, upi=None, region: list[int] | None = None) -
 
     Args:
         uid (str): UniProt accession.
+        upi (str, optional): UniParc accession. Defaults to None.
+        region (tuple[int, int] | None): Residue range [start, end]
     Returns:
         SeqRecord: downloaded FASTA record.
         bool: False if download failed.
@@ -610,7 +613,7 @@ def uniprot_accessions_to_uniparc_accessions(
     Convert UniProt accessions to UniParc accessions using the UniProt
     ID mapping service.
 
-    Usees batching and returns None for accessions that were not mapped
+    Uses batching and returns None for accessions that were not mapped
 
     Args:
         uniprot_accessions (list[str]): UniProt accessions to convert.
@@ -631,16 +634,17 @@ def uniprot_accessions_to_uniparc_accessions(
     return final_mapping
 
 
-def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str, original_fasta=None):
+def generate_fasta_from_uids_with_regions(uids_with_regions: dict[str, tuple[int, int] | None], out_path: str, original_fasta=None):
     """
     Generates a FASTA file containing the sequences (cut down to their corresponding regions) of the given UIDs.
     The records will include the UID and region (if present) in the header.
     
-    If original_fasta is provided, the method will extract sequences from it which are also part of the uids_with_regions.
+    If original_fasta is provided, the method will copy sequences which are also part of the uids_with_regions.
     Otherwise the fasta file is generated from scratch and the Record IDs are of the format: UID or UID/start-end.
+    The sequences are cut to the specified regions if provided.
 
     Args:
-        uids_with_regions (dict): Mapping {uid: [region_start, region_end] or None}.
+        uids_with_regions (dict[str, tuple[int, int] | None]): Mapping {uid: (region_start, region_end) | None}.
         out_path (str): Path to the output FASTA file.
         original_fasta (str, optional): Path to an existing FASTA file with sequences.
     Returns:
@@ -648,7 +652,6 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
     uids = list(uids_with_regions.keys())
     # generate fasta with records of original_fasta file
     if original_fasta is not None:
-        uids = list(uids_with_regions.keys())
         copy_records_from_fasta(original_fasta, uids, out_path)
     # generate fasta with possible regions from scratch
     else:
@@ -668,13 +671,13 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
     return out_path
 
 
-def create_mok_up_record(uid: str, region: list[int] | None) -> SeqRecord:
+def create_mok_up_record(uid: str, region: tuple[int, int] | None) -> SeqRecord:
     """
     Creates a mock-up SeqRecord for a given UID and region.
 
     Args:
         uid (str): The UniProt ID.
-        region (list[int] | None): The region to include in the ID.
+        region (tuple[int, int] | None): The region to include in the ID.
 
     Returns:
         SeqRecord: The created mock-up record.
@@ -688,13 +691,13 @@ def create_mok_up_record(uid: str, region: list[int] | None) -> SeqRecord:
     return record
 
 
-def add_region_to_record(record: SeqRecord, region: list[int] | None) -> SeqRecord:
+def add_region_to_record(record: SeqRecord, region: tuple[int, int] | None) -> SeqRecord:
     """
-    Takes a SeqRecord and modifies its ID to include the region if provided.
+    Takes a SeqRecord and modifies its ID ans Sequence to include the region if provided.
 
     Args:
         record (SeqRecord): The record to modify.
-        region (list[int] | None): The region to include in the ID.
+        region (tuple[int, int] | None): The region to include in the ID and to cut the sequence with.
 
     Returns:
         SeqRecord: The modified record.
@@ -703,17 +706,18 @@ def add_region_to_record(record: SeqRecord, region: list[int] | None) -> SeqReco
         region_str = ""
     else:
         region_str = f"/{int(region[0])}-{int(region[1])}"
+        record = record[region[0]-1 : region[1]]
     record.id = f"{record.id}{region_str}"
     record.description = ""
     return record
 
 
-def copy_records_from_fasta(path_to_fasta: str, uids: list, out_path: str) -> str:
+def copy_records_from_fasta(path_to_fasta: str, uids: list[str], out_path: str) -> str:
     """
     Copies the records with the given uids from the fasta file to a new fasta file.
     Args:
         path_to_fasta (str): Path to the input FASTA file.
-        uids (list): List with UIDs to copy.
+        uids (list[str]): List with UIDs to copy.
         out_path (str): Path to the output FASTA file.
 
     Returns:

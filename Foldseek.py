@@ -1,5 +1,5 @@
 from StructSimTool import StructSimTool
-from utils_for_PDB import reset_dir_content
+from utils_for_structures_and_fasta import reset_dir_content
 import subprocess
 import os
 import pandas as pd

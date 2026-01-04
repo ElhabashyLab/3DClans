@@ -1,7 +1,7 @@
 import sys
 import argparse
 import os
-from utils_for_PDB import *
+from utils_for_structures_and_fasta import *
 from StructSimComputer import StructSimComputer
 from ToolType import ToolType
 from ClansFileGenerator import ClansFileGenerator
@@ -93,10 +93,10 @@ def main():
     selected_tool = ToolType(args.tool)
     foldseek_score = args.score
     saved_input_file = _save_file(path_to_input_file, input_file_type)
-    clans_file_path = _create_clans_file(saved_input_file, input_file_type, selected_tool, foldseek_score)
+    clans_file_path, cleaned_input_file_path = create_clans_file(saved_input_file, input_file_type, selected_tool, foldseek_score)
             
 
-def _create_clans_file(saved_input_file, input_file_type, selected_tool, foldseek_score):
+def create_clans_file(saved_input_file: str, input_file_type: InputFileType, selected_tool: ToolType, foldseek_score: str | None) -> tuple[str, str]:
     """
     Creates a clans file.
 
@@ -107,7 +107,7 @@ def _create_clans_file(saved_input_file, input_file_type, selected_tool, foldsee
         foldseek_score (str): Specifies which score to use if foledseek is the selected tool. Otherwise is None.
 
     Returns:
-        str: Path to generated clans file.
+        (str, str): Path to generated clans file and path to cleaned input file
     """
     uids_with_regions = fetch_pdbs(saved_input_file, input_file_type, "PDBs")
     input_file_name = os.path.basename(saved_input_file).split(".")[0]
@@ -121,10 +121,10 @@ def _create_clans_file(saved_input_file, input_file_type, selected_tool, foldsee
     scores = scores_computer.run(selected_tool, "PDBs")
     clans_generator = ClansFileGenerator()
     clans_file_path = clans_generator.generate_clans_file(scores, cleaned_input_file_path)
-    return clans_file_path
+    return clans_file_path, cleaned_input_file_path
     
 
-def _set_up_scores_computer(selected_tool, foldseek_score):
+def _set_up_scores_computer(selected_tool: ToolType, foldseek_score: str | None) -> StructSimComputer:
     """Creates an instance of a StructSimComputer with the given selected_tool, and a possible foldseekscore.
     
     Args:
