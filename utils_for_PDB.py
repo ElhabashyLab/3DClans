@@ -110,6 +110,8 @@ def extract_uid_from_recordID(record_id):
         uid = record_id.split("|")[1].split(".")[0]
     elif "_" in record_id:
         uid = record_id.split("_")[0].split(".")[0]
+    elif "/" in record_id:
+        uid = record_id.split("/")[0].split(".")[0]
     else:
         # if no '|' is found in header, the header is assumed to be the uid
         uid = record_id.split(".")[0]
@@ -225,27 +227,6 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
             uids_with_regions[uid] = region
     print(f"Downloaded {successful_downloads} from {total_uids} PDB files successfully.")
     return uids_with_regions
-
-
-def download_alphafold_structure_2(uid: str, output_dir: str, region: list[int] | None, file_format: str = "pdb") -> bool:
-    """
-    Downloads the AlphaFold structure of a given protein and saves it in the output_dir.
-    If region is provided, the protein is cut to the specified region.
-
-    Args:
-        uid (str): Protein UniProt ID.
-        output_dir (str): Directory to save the file.
-        region (list[int] | None): Residue range [start, end].
-        file_format (str): 'pdb' or 'cif'.
-    Returns:
-        bool: True if download succeeded.
-    """
-    url = f"https://alphafold.ebi.ac.uk/files/AF-{uid}-F1-model_v6.{file_format}" # This url might change over time depending on model
-    path_to_structure = os.path.join(output_dir, f"{uid}.{file_format}")
-    success = download_file(url, path_to_structure)
-    if success and region:
-        extract_region_of_protein(path_to_structure, file_format, region, path_to_structure) # overwrites path_to_structure
-    return success
 
 
 def download_alphafold_structure(
@@ -421,8 +402,9 @@ def get_meta_data_of_structure_file(path_to_protein: str) -> list[str]:
 
 def download_fasta_record(uid: str, upi=None, region: list[int] | None = None) -> SeqRecord | bool:
     """
-    Download a FASTA record by accession from Uniprot and if it fails from UniParc.
-    If the sequence is found, it returns False.   
+    Download a FASTA record by accession from Uniprot and as a fallback from UniParc.
+    If the record is downloaded from UniParc the initial uid is used as accession-id.
+    If the sequence is not found, it returns False.   
 
     Args:
         uid (str): UniProt accession.
@@ -430,7 +412,6 @@ def download_fasta_record(uid: str, upi=None, region: list[int] | None = None) -
         SeqRecord: downloaded FASTA record.
         bool: False if download failed.
     """
-    # URLs for UniProt and UniParc
     uniprot_api_url = f"https://rest.uniprot.org/uniprotkb/{uid}.fasta"
     uniparc_api_url = f"https://rest.uniprot.org/uniparc/{upi}.fasta"
     urls = [uniprot_api_url, uniparc_api_url if upi is not None else uniprot_api_url]
@@ -674,8 +655,10 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict, out_path: str
         records = []
         uids_to_upis = uniprot_accessions_to_uniparc_accessions(uids)
         for uid, region in uids_with_regions.items():
-            downloaded_record = download_fasta_record(uid, uids_to_upis.get(uid), region)
+            upi = uids_to_upis.get(uid)
+            downloaded_record = download_fasta_record(uid, upi, region)
             if isinstance(downloaded_record, SeqRecord):
+                downloaded_record.id = uid
                 record_with_region = add_region_to_record(downloaded_record, region)
                 records.append(record_with_region)
             else:
