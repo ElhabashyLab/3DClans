@@ -15,7 +15,7 @@ Dataset_Generator/psiblast_results.xml
 Dataset_Generator/__pycache__
 Scores_Evaluation/__pycache__
 Scores_Evaluation/clans_files_*
-Scores_Evaluation/blast_files*
+Scores_Evaluation/blast_temp*
 Scores_Evaluation/datasets*
 Scores_Evaluation/structures*
 Scores_Evaluation/*_working_dir*

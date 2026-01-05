@@ -30,13 +30,14 @@ class ClansFileGenerator:
         return clans_file
     
 
-    def generate_clans_file(self, scores, fasta):
+    def generate_clans_file(self, scores, fasta: str, name_of_clans_file: None | str = None) -> str:
         """
         Generates a CLANS input file from a fasta file and the pairwise similarity scores of the sequences.
         Returns the path to the generated CLANS file.
         Args:
             scores: A pandas DataFrame containing the pairwise similarity scores.
             fasta: A path to the input fasta file.
+            name_of_clans_file: An optional name for the output CLANS file. If not provided, the file will be saved in the self.output_dir with the same name as the fasta file.
         """
         print(f"Generating CLANS file in {self.output_dir}...")
         uids = extract_uids_from_fasta(fasta)
@@ -49,8 +50,11 @@ class ClansFileGenerator:
             scores
         )
         content = clans_file.__str__
-        fasta_name = os.path.basename(fasta).split(".")[0]
-        clans_file_path = os.path.join(self.output_dir, f"{fasta_name}.clans")
+        if name_of_clans_file is not None:
+            name = name_of_clans_file
+        else:
+            name = os.path.basename(fasta).split(".")[0]
+        clans_file_path = os.path.join(self.output_dir, f"{name}.clans")
         with open(clans_file_path, 'w') as file:
             file.write(content())
         print(f"CLANS file generated at {clans_file_path}")
