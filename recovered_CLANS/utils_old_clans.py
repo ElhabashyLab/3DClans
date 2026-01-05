@@ -6,7 +6,7 @@ from InputFileType import InputFileType
 from utils_for_structures_and_fasta import extract_uid_from_recordID
 
 
-def run_clans_headless_from_c_file(input_file: str, output_file: str, recovered_clans_path: str, rounds: int = 100):
+def run_clans_headless_from_c_file(input_file: str, output_file: str, recovered_clans_path: str, p_value: float, rounds: int = 100):
     """
     Runs recovered clans in headless mode on the given clans file and saves the output to the output file.
     Args:
@@ -19,12 +19,12 @@ def run_clans_headless_from_c_file(input_file: str, output_file: str, recovered_
     gradlew = "./gradlew"
     args = [
         gradlew, "run", "--no-daemon",
-        f'--args=-nographics T -load {input_file} -dorounds {rounds} -saveto {output_file}'
+        f'--args=-nographics T -load {input_file} -dorounds {rounds} -saveto {output_file} -pval {p_value}'
     ]
     subprocess.run(args, cwd=recovered_clans_path, check=True)
 
 
-def run_clans_headless_from_f_file(input_file: str, output_file: str, recovered_clans_path: str, blast_dir: str, rounds: int = 100):
+def run_clans_headless_from_f_file(input_file: str, output_file: str, recovered_clans_path: str, blast_dir: str, p_value: float, rounds: int = 100):
     """
     Creates a clans file from the given fasta file using sequence similarity,
     and then runs recovered clans in headless mode on that clans file and saves the output to the output file.
@@ -39,7 +39,7 @@ def run_clans_headless_from_f_file(input_file: str, output_file: str, recovered_
     """
     out_dir_path = os.path.dirname(output_file)
     seq_based_clans_file = generate_clans_file_seq_based(input_file, out_dir_path, blast_dir) 
-    run_clans_headless_from_c_file(seq_based_clans_file, output_file, recovered_clans_path, rounds)
+    run_clans_headless_from_c_file(seq_based_clans_file, output_file, recovered_clans_path, p_value, rounds)
 
 
 def generate_clans_file_seq_based(fasta_file_path: str, out_dir_path: str, blast_dir_path: str) -> str:
@@ -90,26 +90,26 @@ def blast_fasta(fasta_file: str, output_file: str, working_dir: str):
     return [output_file, outfmt.split(" ")[1:]]
     
 
-def run_clans_headless(input_output_files: dict, input_file_type: InputFileType, recovered_clans_path: str, rounds: int = 100000, blast_dir = None):
+def run_clans_headless(input_output_files: dict[str, str], input_file_type: InputFileType, recovered_clans_path: str, rounds: int = 100000, p_value: float = 1E-10, blast_dir: str | None = None):
     """
     Runs recovered clans in headless mode on each of the given input files and saves the output to the corresponding output files.
     The input_output_files dict should contain input_file_path: output_file_path pairs.
     Args:
         input_output_files (dict): A dict containing input_file_path: output_file_path pairs
-        input_file_type (InputFileType): The type of the input files. Can be either InputFileType.CLANS or InputFileType.FASTA.
+        input_file_type (InputFileType): The type of the input files. Can be either InputFileType.CLANS or InputFileType.FASTA or InputFileType.A2M.
         recovered_clans_path (str): A path to the recovered clans project directory
         rounds (int): The number of rounds to run clans for.
+        p-value (float): The p-value for clustering.
         blast_dir (str): A path to the directory where the blast database and results will be stored. Only needed if input_file_type is "fasta".
-        clans_generator (ClansFileGenerator): An optional ClansFileGenerator object to use for generating clans files from fasta files. Must be provided if input_file_type is "fasta".
     Returns: None
     """
     for input_file, output_file in input_output_files.items():
         if input_file_type == InputFileType.CLANS:
-            run_clans_headless_from_c_file(input_file, output_file, recovered_clans_path, rounds)
+            run_clans_headless_from_c_file(input_file, output_file, recovered_clans_path, p_value, rounds)
         elif input_file_type == InputFileType.FASTA:
             if blast_dir is None:
                 raise ValueError("blast_dir must be provided when input_file_type is 'fasta'")
-            run_clans_headless_from_f_file(input_file, output_file, recovered_clans_path, blast_dir, rounds)
+            run_clans_headless_from_f_file(input_file, output_file, recovered_clans_path, blast_dir, p_value, rounds)
         else:
             raise ValueError(f"Invalid input file type: {input_file_type}. Supported types are {InputFileType.CLANS} and {InputFileType.FASTA}.")
         _remove_colorcutoffs_colorarr(output_file)
