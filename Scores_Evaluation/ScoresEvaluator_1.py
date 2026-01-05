@@ -14,10 +14,9 @@ class ScoresEvaluator:
         self.blast_dir = os.path.join(working_dir, "blast_temp")
         self.data = data
         self.input_file_type = input_file_type
-        self.clans_file_generator = ClansFileGenerator(self.working_dir)
 
 
     def generate_clans_files(self, tool: ToolType, score: str | None) -> tuple[str, str]:
-        struct_clans_file_path, cleaned_input_file_path = create_clans_file(self.data, self.input_file_type, tool, score)
-        seq_clans_file_path = generate_clans_file_seq_based(cleaned_input_file_path, self.blast_dir, self.clans_file_generator, self.working_dir)
+        struct_clans_file_path, cleaned_input_file_path = create_clans_file(self.data, self.input_file_type, tool, score, out_dir_path=self.working_dir)
+        seq_clans_file_path = generate_clans_file_seq_based(cleaned_input_file_path, self.working_dir, self.blast_dir)
         return struct_clans_file_path, seq_clans_file_path

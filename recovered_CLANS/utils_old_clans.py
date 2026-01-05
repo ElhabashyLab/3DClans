@@ -6,7 +6,7 @@ from InputFileType import InputFileType
 from utils_for_structures_and_fasta import extract_uid_from_recordID
 
 
-def run_clans_headless_from_c_file(recovered_clans_path: str, input_file: str, output_file: str, rounds: int = 100):
+def run_clans_headless_from_c_file(input_file: str, output_file: str, recovered_clans_path: str, rounds: int = 100):
     """
     Runs recovered clans in headless mode on the given clans file and saves the output to the output file.
     Args:
@@ -24,10 +24,10 @@ def run_clans_headless_from_c_file(recovered_clans_path: str, input_file: str, o
     subprocess.run(args, cwd=recovered_clans_path, check=True)
 
 
-def run_clans_headless_from_f_file(recovered_clans_path: str, input_file: str, output_file: str, blast_dir: str, clans_file_generator: ClansFileGenerator, rounds: int = 100):
+def run_clans_headless_from_f_file(input_file: str, output_file: str, recovered_clans_path: str, blast_dir: str, rounds: int = 100):
     """
-    Runs recovered clans in headless mode on the given fasta file and saves the output to the output file.
-    From the fasta file, a clans file will be created using blast, and then CLANS will be run on that clans file.
+    Creates a clans file from the given fasta file using sequence similarity,
+    and then runs recovered clans in headless mode on that clans file and saves the output to the output file.
     Default settings for blast will be used.
     Args:
         input_file (str): A path to the input fasta file
@@ -37,19 +37,19 @@ def run_clans_headless_from_f_file(recovered_clans_path: str, input_file: str, o
         rounds (int): The number of rounds to run clans for.
     Returns: None
     """
-    seq_based_clans_file = generate_clans_file_seq_based(input_file, blast_dir, clans_file_generator, recovered_clans_path) 
-    run_clans_headless_from_c_file(recovered_clans_path, seq_based_clans_file, output_file, rounds)
+    out_dir_path = os.path.dirname(output_file)
+    seq_based_clans_file = generate_clans_file_seq_based(input_file, out_dir_path, blast_dir) 
+    run_clans_headless_from_c_file(seq_based_clans_file, output_file, recovered_clans_path, rounds)
 
 
-def generate_clans_file_seq_based(fasta_file_path: str, blast_dir_path: str, clans_file_generator: ClansFileGenerator, out_path: str) -> str:
+def generate_clans_file_seq_based(fasta_file_path: str, out_dir_path: str, blast_dir_path: str) -> str:
     """
     Generates a clans file based on sequence similarity from the given fasta file and blast results.
     The clans files is generated using the default parameters of the CLANS-web-tool.
     Args:
         fasta_file_path (str): A path to the input fasta file
+        out_dir_path (str): A path to the output directory where the clans file will be saved
         blast_dir_path (str): A path to the directory where the blast database and results will be stored
-        clans_file_generator (ClansFileGenerator): An instance of ClansFileGenerator to generate the clans file
-        out_path (str): A path to the output directory where the clans file will be saved
     Returns:
         str: A path to the generated clans file
     """
@@ -61,6 +61,7 @@ def generate_clans_file_seq_based(fasta_file_path: str, blast_dir_path: str, cla
     blast_results_df["PDBchain2"] = blast_results_df["PDBchain2"].apply(extract_uid_from_recordID)
     blast_results_df = blast_results_df[blast_results_df['PDBchain1'] != blast_results_df['PDBchain2']] # remove self-hits
     scores_df = blast_results_df.drop_duplicates(subset=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
+    clans_file_generator = ClansFileGenerator(out_dir_path)
     clans_file_path = clans_file_generator.generate_clans_file(scores_df, fasta_file_path)
     return clans_file_path
 
@@ -88,14 +89,14 @@ def blast_fasta(fasta_file: str, output_file: str, working_dir: str):
     return [output_file, outfmt.split(" ")[1:]]
     
 
-def run_clans_headless(recovered_clans_path: str, input_output_files: dict, input_file_type: InputFileType, rounds: int = 100000, blast_dir = None, clans_generator = None):
+def run_clans_headless(input_output_files: dict, input_file_type: InputFileType, recovered_clans_path: str, rounds: int = 100000, blast_dir = None):
     """
     Runs recovered clans in headless mode on each of the given input files and saves the output to the corresponding output files.
     The input_output_files dict should contain input_file_path: output_file_path pairs.
     Args:
         input_output_files (dict): A dict containing input_file_path: output_file_path pairs
-        recovered_clans_path (str): A path to the recovered clans project directory
         input_file_type (InputFileType): The type of the input files. Can be either InputFileType.CLANS or InputFileType.FASTA.
+        recovered_clans_path (str): A path to the recovered clans project directory
         rounds (int): The number of rounds to run clans for.
         blast_dir (str): A path to the directory where the blast database and results will be stored. Only needed if input_file_type is "fasta".
         clans_generator (ClansFileGenerator): An optional ClansFileGenerator object to use for generating clans files from fasta files. Must be provided if input_file_type is "fasta".
@@ -103,13 +104,11 @@ def run_clans_headless(recovered_clans_path: str, input_output_files: dict, inpu
     """
     for input_file, output_file in input_output_files.items():
         if input_file_type == InputFileType.CLANS:
-            run_clans_headless_from_c_file(recovered_clans_path, input_file, output_file, rounds)
+            run_clans_headless_from_c_file(input_file, output_file, recovered_clans_path, rounds)
         elif input_file_type == InputFileType.FASTA:
             if blast_dir is None:
                 raise ValueError("blast_dir must be provided when input_file_type is 'fasta'")
-            if clans_generator is None:
-                raise ValueError("clans_generator must be provided when input_file_type is 'fasta'")
-            run_clans_headless_from_f_file(recovered_clans_path, input_file, output_file, blast_dir, clans_generator, rounds)
+            run_clans_headless_from_f_file(input_file, output_file, recovered_clans_path, blast_dir, rounds)
         else:
             raise ValueError(f"Invalid input file type: {input_file_type}. Supported types are {InputFileType.CLANS} and {InputFileType.FASTA}.")
         _remove_colorcutoffs_colorarr(output_file)

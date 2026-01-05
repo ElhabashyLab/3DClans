@@ -102,7 +102,7 @@ def create_clans_file(
     selected_tool: ToolType,
     foldseek_score: str | None,
     structures_dir: str = "PDB",
-    out_file_path: str = "clans_files"
+    out_dir_path: str = "clans_files"
     ) -> tuple[str, str]:
     """
     Creates a clans file.
@@ -111,8 +111,9 @@ def create_clans_file(
         input_file_path (str): path to the saved input file.
         input_file_type (InputFileType): Type of the input file.
         selected_tool (ToolType): Type of tool which is to generate structural similarity scores.
-        foldseek_score (str): Specifies which score to use if foledseek is the selected tool. Otherwise is None.
+        foldseek_score (str): Specifies which score to use if foldseek is the selected tool. Otherwise is None.
         structures_dir (str): Path to the directory containing the structures.
+        out_dir_path (str): Path to the output directory where the clans file will be saved.
 
     Returns:
         (str, str): Path to generated clans file and path to cleaned input file
@@ -127,7 +128,7 @@ def create_clans_file(
         cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path)
     scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
     scores = scores_computer.run(selected_tool, structures_dir)
-    clans_generator = ClansFileGenerator(out_file_path)
+    clans_generator = ClansFileGenerator(out_dir_path)
     clans_file_path = clans_generator.generate_clans_file(scores, cleaned_input_file_path)
     return clans_file_path, cleaned_input_file_path
     

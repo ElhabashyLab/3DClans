@@ -11,9 +11,7 @@ class ClansFileGenerator:
     """
     def __init__(self, output_dir: str ="clans_files"):
         self.output_dir = output_dir
-        if os.path.exists(self.output_dir):
-            reset_dir_content(self.output_dir)
-        else:
+        if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
     
