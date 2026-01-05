@@ -22,7 +22,7 @@ from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
 from scipy.spatial import procrustes
 
 
-class ScoresEvaluator:
+class ScoresEvaluator_2:
     """
     This class is responsible for evaluating the structure similarity scores by comparing them to sequence similarity scores.
     The datasets used for the evaluation can be generated with the DatasetGenerator class with the given seeds.

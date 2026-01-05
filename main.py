@@ -96,30 +96,38 @@ def main():
     clans_file_path, cleaned_input_file_path = create_clans_file(saved_input_file, input_file_type, selected_tool, foldseek_score)
             
 
-def create_clans_file(saved_input_file: str, input_file_type: InputFileType, selected_tool: ToolType, foldseek_score: str | None) -> tuple[str, str]:
+def create_clans_file(
+    input_file_path: str,
+    input_file_type: InputFileType,
+    selected_tool: ToolType,
+    foldseek_score: str | None,
+    structures_dir: str = "PDB",
+    out_file_path: str = "clans_files"
+    ) -> tuple[str, str]:
     """
     Creates a clans file.
 
     Args:
-        saved_input_file (str): path to the saved input file.
+        input_file_path (str): path to the saved input file.
         input_file_type (InputFileType): Type of the input file.
         selected_tool (ToolType): Type of tool which is to generate structural similarity scores.
         foldseek_score (str): Specifies which score to use if foledseek is the selected tool. Otherwise is None.
+        structures_dir (str): Path to the directory containing the structures.
 
     Returns:
         (str, str): Path to generated clans file and path to cleaned input file
     """
-    uids_with_regions = fetch_pdbs(saved_input_file, input_file_type, "PDBs")
-    input_file_name = os.path.basename(saved_input_file).split(".")[0]
-    input_file_dir = os.path.dirname(saved_input_file)
+    uids_with_regions = fetch_pdbs(input_file_path, input_file_type, structures_dir)
+    input_file_name = os.path.basename(input_file_path).split(".")[0]
+    input_file_dir = os.path.dirname(input_file_path)
     cleaned_input_file_path = os.path.join(input_file_dir, f"{input_file_name}_cleaned.fasta")
     if input_file_type == InputFileType.FASTA:
-        cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path, saved_input_file)
+        cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path, input_file_path)
     else:
         cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path)
     scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
-    scores = scores_computer.run(selected_tool, "PDBs")
-    clans_generator = ClansFileGenerator()
+    scores = scores_computer.run(selected_tool, structures_dir)
+    clans_generator = ClansFileGenerator(out_file_path)
     clans_file_path = clans_generator.generate_clans_file(scores, cleaned_input_file_path)
     return clans_file_path, cleaned_input_file_path
     

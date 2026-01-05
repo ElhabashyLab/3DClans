@@ -9,7 +9,7 @@ class ClansFileGenerator:
     This class is responsible for generating a CLANS input file from a fasta file.
     It is also able to parse CLANS files and extract the relevant information.
     """
-    def __init__(self, output_dir="clans_files"):
+    def __init__(self, output_dir: str ="clans_files"):
         self.output_dir = output_dir
         if os.path.exists(self.output_dir):
             reset_dir_content(self.output_dir)

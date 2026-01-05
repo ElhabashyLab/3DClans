@@ -8,7 +8,7 @@ from recovered_CLANS.utils_old_clans import generate_clans_file_seq_based
 from ClansFileGenerator import ClansFileGenerator
 
 
-class ScoresEvaluator_2:
+class ScoresEvaluator:
     def __init__(self, working_dir: str, data: str, input_file_type: InputFileType):
         self.working_dir = working_dir
         self.blast_dir = os.path.join(working_dir, "blast_temp")
