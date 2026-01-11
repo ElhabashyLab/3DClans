@@ -101,7 +101,7 @@ def create_clans_file(
     input_file_type: InputFileType,
     selected_tool: ToolType,
     foldseek_score: str | None,
-    structures_dir: str = "PDB",
+    structures_dir: str = "structures",
     out_dir_path: str = "clans_files"
     ) -> tuple[str, str]:
     """
@@ -116,7 +116,7 @@ def create_clans_file(
         out_dir_path (str): Path to the output directory where the clans file will be saved.
 
     Returns:
-        (str, str): Path to generated clans file and path to cleaned input file
+        (str, str): Path to generated clans file and path to cleaned input file as fasta.
     """
     uids_with_regions = fetch_pdbs(input_file_path, input_file_type, structures_dir)
     input_file_name = os.path.basename(input_file_path).split(".")[0]
