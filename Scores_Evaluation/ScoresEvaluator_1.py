@@ -43,31 +43,23 @@ class ScoresEvaluator:
             "load": clans_files[0],
             "dorounds": rounds_to_cluster[0],
             "saveto": struct_clans_file_clustered_path,
-            "pval": p_values[0],
-            "verbose": int(verbose)
+            "pval": p_values[0]
         })
+        run_clans_headless(conf_file_struct, cluster2D[0], path_to_clans_executable)
+        
         conf_file_seq = ConfigFile(os.path.join(self.working_dir, seq_clans_file_basename.replace(".clans", ".conf")))
         conf_file_seq.write_config({
             "nographics": "T",
             "load": clans_files[1],
             "dorounds": rounds_to_cluster[1],
             "saveto": seq_clans_file_clustered_path,
-            "pval": p_values[1],
-            "verbose": int(verbose)
+            "pval": p_values[1]
         })
-
-        run_clans_headless(
-            conf_file_struct,
-            cluster2D[0],
-            path_to_clans_executable)
-
-        run_clans_headless(
-            conf_file_seq,
-            cluster2D[1],
-            path_to_clans_executable)
+        run_clans_headless(conf_file_seq, cluster2D[1], path_to_clans_executable)
         
         return (struct_clans_file_clustered_path, seq_clans_file_clustered_path)
 
 
     def evaluate_clustered_clans_files(self, clustered_clans_files: tuple[str, str]):
         pass
+    

@@ -74,9 +74,12 @@ class ClansFile:
         Parses a CLANS file from a string and returns a ClansFile object.
         Args:
             string: A string representation of a CLANS file.
+        Returns:
+            ClansFile: A ClansFile object.
         """
         lines = [line.strip() for line in string.strip().splitlines() if line.strip()]
         number_of_sequences = cls._parse_number_of_sequences(lines)
+        params = cls._parse_param_block(lines)
         fasta_records = cls._parse_fasta_block(lines)
         coordinates = cls._parse_pos_block(lines)
         scores_df = cls._parse_scores_block(lines)
@@ -157,6 +160,25 @@ class ClansFile:
             raise ValueError("Missing 'sequences=' line.")
         number_of_sequences = int(seq_count_line.split("=")[1])
         return number_of_sequences
+    
+    
+    @staticmethod
+    def _parse_param_block(lines):
+        """Extracts and parses the param block from the lines.
+
+        Args:
+            lines (list): The list of lines to search within.
+        Returns:
+            dict: A dictionary containing the parsed parameters.
+        """
+        param_block = ClansFile._extract_block("param", lines)
+        params = {}
+        for line in param_block:
+            if not line:
+                continue
+            key, value = line.split("=")
+            params[key.strip()] = value.strip()
+        return params
 
 
     @staticmethod

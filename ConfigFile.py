@@ -11,7 +11,7 @@ class ConfigFile():
 
     def write_config(self, arguments: dict):
         """
-        Writes the configuration file with the given arguments to the specified filepath.
+        Writes the configuration file with the given arguments to self.filepath.
 
         Args:
             arguments (dict): A dictionary containing the configuration key-value pairs.

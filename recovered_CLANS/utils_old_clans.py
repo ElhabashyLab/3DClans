@@ -22,13 +22,50 @@ def run_clans_headless(
     """
     arguments = config_file.read_config()
     outfile = arguments.get("saveto")
+    pval = arguments.get("pval")
+    clans_file_path = arguments.get("load")
+    if pval is not None and clans_file_path is not None:
+        temp_big_smell_method_add_pval(clans_file_path, float(pval))
+    
     gradlew = "./gradlew"
     args = [
         gradlew, "run", "--no-daemon",
-        f'--args=-conf {config_file.filepath}'
+        f"--args=-conf {config_file.filepath}"
     ]
     subprocess.run(args, cwd=recovered_clans_path, check=True)
     _remove_colorcutoffs_colorarr(outfile)
+    
+    
+def temp_big_smell_method_add_pval(clans_file_path: str, pval: float):
+    """
+    Adds pval to the parameter block in a CLANS file.
+    If no <param> block exists, one is created.
+    """
+    # Lines you want to add (EDIT AS NEEDED)
+    line_to_add = f"pval={pval}"
+
+    with open(clans_file_path, "r") as f:
+        lines = f.readlines()
+
+    has_param_block = any(line.strip() == "<param>" for line in lines)
+
+    if has_param_block:
+        # Insert before </param>
+        for i, line in enumerate(lines):
+            if line.strip() == "</param>":
+                lines.insert(i, line_to_add + "\n")
+                break
+    else:
+        # Create param block after the first line (usually sequences=...)
+        new_block = ["<param>\n"]
+        new_block.append(line_to_add + "\n")
+        new_block.append("</param>\n")
+
+        # Insert after header line
+        lines[1:1] = new_block
+
+    with open(clans_file_path, "w") as f:
+        f.writelines(lines)
 
 
 def generate_clans_file_seq_based(fasta_file_path: str, out_dir_path: str, blast_dir_path: str) -> str:
@@ -96,5 +133,3 @@ def _remove_colorcutoffs_colorarr(clans_file):
                     continue # remove buggy lines
                 f.write(line)
     
-
-# tests
