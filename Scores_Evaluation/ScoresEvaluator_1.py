@@ -6,6 +6,7 @@ from InputFileType import InputFileType
 from main import create_clans_file
 from recovered_CLANS.utils_old_clans import generate_clans_file_seq_based, run_clans_headless
 from ConfigFile import ConfigFile
+from ClansFileGenerator import ClansFileGenerator
 
 
 class ScoresEvaluator:
@@ -66,5 +67,9 @@ class ScoresEvaluator:
 
 
     def evaluate_clustered_clans_files(self, clustered_clans_files: tuple[str, str]):
-        pass
+        print(f"\nEvaluating clustered clans files: {clustered_clans_files[0]} and {clustered_clans_files[1]}")
+        clans_file_generator = ClansFileGenerator()
+        struct_clans_file = clans_file_generator.parse_clans_file(clustered_clans_files[0])
+        seq_clans_file = clans_file_generator.parse_clans_file(clustered_clans_files[1])
+        return None
     

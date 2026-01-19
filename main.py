@@ -128,8 +128,10 @@ def create_clans_file(
         cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path)
     scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
     scores = scores_computer.run(selected_tool, structures_dir)
-    clans_generator = ClansFileGenerator(out_dir_path)
-    clans_file_path = clans_generator.generate_clans_file(scores, cleaned_input_file_path)
+    clans_generator = ClansFileGenerator()
+    input_file_cleaned_name = os.path.basename(cleaned_input_file_path).split(".")[0]
+    out_path = os.path.join(out_dir_path, f"{input_file_cleaned_name}.clans")
+    clans_file_path = clans_generator.generate_clans_file(scores, cleaned_input_file_path, out_path)
     return clans_file_path, cleaned_input_file_path
     
 

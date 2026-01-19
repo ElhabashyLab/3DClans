@@ -47,8 +47,9 @@ def generate_clans_file_seq_based(fasta_file_path: str, out_dir_path: str, blast
     blast_results_df["PDBchain2"] = blast_results_df["PDBchain2"].apply(extract_uid_from_recordID)
     blast_results_df = blast_results_df[blast_results_df['PDBchain1'] != blast_results_df['PDBchain2']] # remove self-hits
     scores_df = blast_results_df.drop_duplicates(subset=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
-    clans_file_generator = ClansFileGenerator(out_dir_path)
-    clans_file_path = clans_file_generator.generate_clans_file(scores_df, fasta_file_path, name_of_clans_file=f"{input_file_name}_seq")
+    clans_file_generator = ClansFileGenerator()
+    out_path = os.path.join(out_dir_path, f"{input_file_name}_seq.clans")
+    clans_file_path = clans_file_generator.generate_clans_file(scores_df, fasta_file_path, out_path)
     return clans_file_path
 
 
