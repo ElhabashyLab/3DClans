@@ -7,65 +7,24 @@ from utils_for_structures_and_fasta import extract_uid_from_recordID
 from ConfigFile import ConfigFile
         
 
-def run_clans_headless(
-    config_file: ConfigFile,
-    cluster2D: bool,
-    recovered_clans_path: str):
+def run_clans_headless(config_file: ConfigFile, path_clans_executable: str):
     """
-    Runs recovered clans in headless mode with a given config file.
-    Removes buggy lines from the output clans file after running.
+    Runs clans executable in headless mode with a given config file.
     Args:
         config_file (ConfigFile): A config file object
-        cluster2D (bool): Whether to perform 2D clustering
-        recovered_clans_path (str): A path to the recovered clans directory
-    Returns: None
+        path_clans_executable (str): A path to the clans executable (jar file)
+    Returns: str: A path to the output clans file as specified in the config file
     """
     arguments = config_file.read_config()
     outfile = arguments.get("saveto")
-    pval = arguments.get("pval")
-    clans_file_path = arguments.get("load")
-    if pval is not None and clans_file_path is not None:
-        temp_big_smell_method_add_pval(clans_file_path, float(pval))
-    
-    gradlew = "./gradlew"
-    args = [
-        gradlew, "run", "--no-daemon",
-        f"--args=-conf {config_file.filepath}"
-    ]
-    subprocess.run(args, cwd=recovered_clans_path, check=True)
-    _remove_colorcutoffs_colorarr(outfile)
-    
-    
-def temp_big_smell_method_add_pval(clans_file_path: str, pval: float):
-    """
-    Adds pval to the parameter block in a CLANS file.
-    If no <param> block exists, one is created.
-    """
-    # Lines you want to add (EDIT AS NEEDED)
-    line_to_add = f"pval={pval}"
-
-    with open(clans_file_path, "r") as f:
-        lines = f.readlines()
-
-    has_param_block = any(line.strip() == "<param>" for line in lines)
-
-    if has_param_block:
-        # Insert before </param>
-        for i, line in enumerate(lines):
-            if line.strip() == "</param>":
-                lines.insert(i, line_to_add + "\n")
-                break
-    else:
-        # Create param block after the first line (usually sequences=...)
-        new_block = ["<param>\n"]
-        new_block.append(line_to_add + "\n")
-        new_block.append("</param>\n")
-
-        # Insert after header line
-        lines[1:1] = new_block
-
-    with open(clans_file_path, "w") as f:
-        f.writelines(lines)
+    arguments_of_conf = []
+    for key, value in arguments.items():
+        arguments_of_conf.append(f"-{key}")
+        arguments_of_conf.append(str(value))
+    print("\nrunning with " + " ".join(arguments_of_conf))
+    args = ["java", "-Xmx4G", "-jar", path_clans_executable] + arguments_of_conf
+    subprocess.run(args, check=True)
+    return outfile
 
 
 def generate_clans_file_seq_based(fasta_file_path: str, out_dir_path: str, blast_dir_path: str) -> str:
@@ -132,4 +91,36 @@ def _remove_colorcutoffs_colorarr(clans_file):
                 if line.startswith("colorcutoffs") or line.startswith("colorarr"):
                     continue # remove buggy lines
                 f.write(line)
+                
+                
+def temp_add_pval_to_clans_file(clans_file_path: str, pval: float):
+    """
+    Adds pval to the parameter block in a CLANS file.
+    If no <param> block exists, one is created.
+    """
+    # Lines you want to add (EDIT AS NEEDED)
+    line_to_add = f"pval={pval}"
+
+    with open(clans_file_path, "r") as f:
+        lines = f.readlines()
+
+    has_param_block = any(line.strip() == "<param>" for line in lines)
+
+    if has_param_block:
+        # Insert before </param>
+        for i, line in enumerate(lines):
+            if line.strip() == "</param>":
+                lines.insert(i, line_to_add + "\n")
+                break
+    else:
+        # Create param block after the first line (usually sequences=...)
+        new_block = ["<param>\n"]
+        new_block.append(line_to_add + "\n")
+        new_block.append("</param>\n")
+
+        # Insert after header line
+        lines[1:1] = new_block
+
+    with open(clans_file_path, "w") as f:
+        f.writelines(lines)
     

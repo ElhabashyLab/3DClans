@@ -28,8 +28,9 @@ class ScoresEvaluator:
                             clans_files: tuple[str, str],
                             rounds_to_cluster: tuple[int, int],
                             p_values: tuple[float, float],
-                            cluster2D: tuple[bool, bool],
+                            cluster2d: tuple[bool, bool],
                             verbose: bool) -> tuple[str, str]:
+        
         struct_clans_file_basename = os.path.basename(clans_files[0])
         seq_clans_file_basename = os.path.basename(clans_files[1])
         struct_clans_file_clustered_name = struct_clans_file_basename.replace(".clans", f"_clustered_r_{rounds_to_cluster[0]}_p_{p_values[0]}.clans")
@@ -43,9 +44,11 @@ class ScoresEvaluator:
             "load": clans_files[0],
             "dorounds": rounds_to_cluster[0],
             "saveto": struct_clans_file_clustered_path,
-            "pval": p_values[0]
+            "pval": p_values[0],
+            "cluster2d": "T" if cluster2d[0] else "F",
+            "verbose": int(verbose)
         })
-        run_clans_headless(conf_file_struct, cluster2D[0], path_to_clans_executable)
+        run_clans_headless(conf_file_struct, path_to_clans_executable)
         
         conf_file_seq = ConfigFile(os.path.join(self.working_dir, seq_clans_file_basename.replace(".clans", ".conf")))
         conf_file_seq.write_config({
@@ -53,9 +56,11 @@ class ScoresEvaluator:
             "load": clans_files[1],
             "dorounds": rounds_to_cluster[1],
             "saveto": seq_clans_file_clustered_path,
-            "pval": p_values[1]
+            "pval": p_values[1],
+            "cluster2d": "T" if cluster2d[1] else "F",
+            "verbose": int(verbose)
         })
-        run_clans_headless(conf_file_seq, cluster2D[1], path_to_clans_executable)
+        run_clans_headless(conf_file_seq, path_to_clans_executable)
         
         return (struct_clans_file_clustered_path, seq_clans_file_clustered_path)
 
