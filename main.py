@@ -6,7 +6,8 @@ from StructSimComputer import StructSimComputer
 from ToolType import ToolType
 from ClansFileGenerator import ClansFileGenerator
 from InputFileType import InputFileType
-    
+from ConfigFile import ConfigFile
+
 
 def _save_file(file_path: str, input_file_type: InputFileType) -> str:
     """
@@ -65,6 +66,13 @@ def _set_up_parser() -> argparse.ArgumentParser:
     )
     
     parser.add_argument(
+        "-c", "--conf",
+        required=False,
+        type=str,
+        help="specifies the path to the configuration file with the format -<key> <value>. The configuration file arguments will be overwritten by command line arguments."
+    )
+    
+    parser.add_argument(
         "-t", "--tool",
         required=True,
         choices=[tool.value for tool in ToolType],
@@ -81,21 +89,53 @@ def _set_up_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main():
-    """
-    The main method.
-    Reads the input of the user and directs the generation of a clans file
-    """
-    parser = _set_up_parser()
-    args = parser.parse_args()
-    input_file_type = InputFileType(args.input_type)
-    path_to_input_file = args.load
-    selected_tool = ToolType(args.tool)
-    foldseek_score = args.score
-    saved_input_file = _save_file(path_to_input_file, input_file_type)
-    clans_file_path, cleaned_input_file_path = create_clans_file(saved_input_file, input_file_type, selected_tool, foldseek_score)
-            
+def _set_up_conf_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Parser for configuration file.")
+    parser.add_argument("-c", "--conf", type=str)
+    return parser
 
+    
+def main():
+    # parse configuration file arguments and merge with command line arguments (command line arguments take precedence)
+    conf_parser = _set_up_conf_parser()
+    conf_args, _ = conf_parser.parse_known_args()
+    config_argv = []
+    if conf_args.conf:
+        conf_dict = ConfigFile(conf_args.conf).read_config()
+        config_argv = _config_dict_to_argv(conf_dict)    
+    merged_argv = config_argv + sys.argv[1:]
+    # parse merged arguments
+    parser = _set_up_parser()
+    args = parser.parse_args(merged_argv)
+    # process input file and create clans file
+    saved_input_file = _save_file(args.load, InputFileType(args.input_type))
+    clans_file_path, cleaned_input_file_path = create_clans_file(
+        saved_input_file,
+        InputFileType(args.input_type),
+        ToolType(args.tool),
+        args.score,
+    )
+    return clans_file_path, cleaned_input_file_path
+    
+    
+def _config_dict_to_argv(config: dict) -> list[str]:
+    """
+    Converts a config dictionary to a list of argv strings.
+    The arguments are formatted as '--key value'.
+
+    Args:
+        config (dict): A dictionary containing configuration key-value pairs.
+
+    Returns:
+        list[str]: A list of strings formatted as command-line arguments.
+    """
+    argv = []
+    for key, value in config.items():
+        argv.append(f"--{key}")
+        argv.append(str(value))
+    return argv
+    
+    
 def create_clans_file(
     input_file_path: str,
     input_file_type: InputFileType,

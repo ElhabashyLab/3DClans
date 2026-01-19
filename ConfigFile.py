@@ -3,10 +3,10 @@ from InputFileType import InputFileType
 
 
 class ConfigFile():
-    def __init__(self, filepath: str):
+    def __init__(self, filepath: str, documentation: str|None = None):
         self.filepath = filepath
         self.InputFileType = InputFileType.CONF
-        self.documentation = "# Configuration file for CLANS\n# Each line contains a key-value pair in the format -<key> <value>.\n# Lines starting with '#' are comments and will be ignored."
+        self.documentation = documentation
 
 
     def write_config(self, arguments: dict):
@@ -18,7 +18,8 @@ class ConfigFile():
         Returns: None
         """
         with open(self.filepath, 'w') as f:
-            f.write(self.documentation + "\n")
+            if self.documentation:
+                f.write("# " + self.documentation + "\n")
             for key, value in arguments.items():
                 f.write(f"-{key} {value}\n")
 
@@ -62,7 +63,10 @@ class ConfigFile():
     
     
 # tests
-#test_conf = ConfigFile("test.conf")
-#test_conf.write_config({"Arg1": "Value1", "Arg2": "Value2"})
+#test_conf = ConfigFile("example_files/config_files/test_new_clans.conf", documentation="This is a test configuration file.")
+#test_conf.write_config({"load": "example_files/small_fasta_files/50.fasta",
+#                        "input_type": "fasta",
+#                        "tool": "foldseek",
+#                        "score": "evalue"})
 #config_data = test_conf.read_config()
 #print(config_data)  # Expected output: {'Arg1': 'Value1', 'Arg2': 'Value2'}
