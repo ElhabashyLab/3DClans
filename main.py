@@ -9,41 +9,6 @@ from InputFileType import InputFileType
 from ConfigFile import ConfigFile
 
 
-def _save_file(file_path: str, input_file_type: InputFileType) -> str:
-    """
-    Reads and stores a CLANS file, FASTA file or a list of uids with a given file-path.
-    
-    :param file_path: path to file
-    :param input_file_type: specifies if input is CLANS file, FASTA file or a list of uids as a tsv file
-    :return: path to saved file
-    :raises: FileNotFoundError, IOError if file operations fail
-    """
-    print(f"Processing {file_path}...")
-    try:
-        with open(file_path, 'r') as file:
-            content = file.read()
-    except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found.", file=sys.stderr)
-        raise FileNotFoundError
-    except IOError as e:
-        print(f"Error reading file '{file_path}': {e}", file=sys.stderr)
-        raise IOError
-    
-    os.makedirs('input_file_storage', exist_ok=True)
-    input_file_name = os.path.basename(file_path).split(".")[0]
-    output_filename = f"{input_file_name}.{input_file_type.value}"
-    path_to_stored_file = os.path.join('input_file_storage', output_filename)
-    
-    try:
-        with open(path_to_stored_file, 'w') as input_file:
-            input_file.write(content)
-        print(f"File successfully saved to: {path_to_stored_file}")
-        return path_to_stored_file
-    except IOError as e:
-        print(f"Error writing file '{path_to_stored_file}': {e}", file=sys.stderr)
-        raise IOError
-
-
 def _set_up_parser() -> argparse.ArgumentParser:
     """
     Sets up the command line parser.
@@ -108,9 +73,9 @@ def main():
     parser = _set_up_parser()
     args = parser.parse_args(merged_argv)
     # process input file and create clans file
-    saved_input_file = _save_file(args.load, InputFileType(args.input_type))
+    input_file = args.load
     clans_file_path, cleaned_input_file_path = create_clans_file(
-        saved_input_file,
+        input_file,
         InputFileType(args.input_type),
         ToolType(args.tool),
         args.score,
@@ -161,7 +126,8 @@ def create_clans_file(
     uids_with_regions = fetch_pdbs(input_file_path, input_file_type, structures_dir)
     input_file_name = os.path.basename(input_file_path).split(".")[0]
     input_file_dir = os.path.dirname(input_file_path)
-    cleaned_input_file_path = os.path.join(input_file_dir, f"{input_file_name}_cleaned.fasta")
+    os.makedirs("input_file_storage", exist_ok=True)
+    cleaned_input_file_path = os.path.join("input_file_storage", f"{input_file_name}_cleaned.fasta")
     if input_file_type == InputFileType.FASTA:
         cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path, input_file_path)
     else:

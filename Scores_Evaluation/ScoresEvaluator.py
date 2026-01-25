@@ -10,6 +10,8 @@ from ClansFileGenerator import ClansFileGenerator
 import pandas as pd
 from scipy.spatial.distance import pdist
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 class ScoresEvaluator:
@@ -69,7 +71,21 @@ class ScoresEvaluator:
         return (struct_clans_file_clustered_path, seq_clans_file_clustered_path)
 
 
-    def extract_data_from_clans_files(self, clustered_clans_files: tuple[str, str]):
+    def extract_data_from_clans_files(self, clustered_clans_files: tuple[str, str]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Extracts scores and coordinates from a structural and sequence clans file.
+        It returns multiple DataFrames:
+        
+        1. df_scores with columns [Sequence_ID_1, Sequence_ID_2, Score_struct, Score_-log10_struct Score_seq, Score_-log10_seq]
+        2. df_euclidean_dist [Sequence_ID_1, Sequence_ID_2, euclidean_dist_struct, euclidean_dist_min_max_struct, euclidean_dist_seq, euclidean_dist_min_max_seq]
+        3. df_coord [Sequence_ID, x_struct, y_struct, z_struct, x_seq, y_seq z_seq]
+        
+        Args:
+            clustered_clans_files (tuple[str, str]): Paths to the structural and sequence clans file.
+
+        Returns:
+            tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: df_scores, df_euclidean_dist, df_coord
+        """
         print(f"\nEvaluating clustered clans files: {clustered_clans_files[0]} and {clustered_clans_files[1]}")
         # get data from struct clans file
         df_struct_scores, df_struct_coord = self.extract_data_from_clans_file_to_df(clustered_clans_files[0])
@@ -217,3 +233,61 @@ class ScoresEvaluator:
         if (col <= 0).any():
             raise ValueError("Cannot apply -log10 to zero or negative values.")
         return pd.Series(-np.log10(col.values), index=col.index)
+    
+    
+    def generate_scatter_plot(self, data_x: pd.Series, data_y: pd.Series, 
+                        x_label: str|None = None, y_label: str|None = None, 
+                        title: str|None = None, save_path: str|None = None):
+        """
+        Generates a scatter plot comparing two sets of values.
+
+        Args:
+            data_x (pd.Series or list-like): Values for the x-axis.
+            data_y (pd.Series or list-like): Values for the y-axis.
+            x_label (str, optional): Label for x-axis. Defaults to None.
+            y_label (str, optional): Label for y-axis. Defaults to None.
+            title (str, optional): Plot title. Defaults to None.
+            save_path (str, optional): Path to save the figure. If None, plot is shown. Defaults to None.
+
+        Returns:
+            None
+        """
+        # Convert to pandas Series if needed
+        data_x = pd.Series(data_x)
+        data_y = pd.Series(data_y)
+
+        # Basic sanity check
+        if len(data_x) != len(data_y):
+            raise ValueError("data_x and data_y must have the same length.")
+
+        # Default labels if not provided
+        if x_label is None:
+            x_label = "X-axis"
+        if y_label is None:
+            y_label = "Y-axis"
+        if title is None:
+            title = f"{y_label} vs {x_label}"
+
+        plt.figure(figsize=(6, 6))
+        sns.scatterplot(x=data_x, y=data_y, alpha=0.7, edgecolor=None)
+
+        # Plot identity line y=x for reference
+        min_val = min(data_x.min(), data_y.min())
+        max_val = max(data_x.max(), data_y.max())
+        plt.plot([min_val, max_val], [min_val, max_val], linestyle='--', color='gray', alpha=0.5)
+
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.title(title)
+        plt.tight_layout()
+
+        if save_path:
+            plt.savefig(save_path, dpi=300)
+            plt.close()
+        else:
+            plt.show()
+            
+            
+    def find_clusters(self):
+        pass
+    
