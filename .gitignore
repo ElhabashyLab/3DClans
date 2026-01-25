@@ -20,6 +20,7 @@ Dataset_Generator/__pycache__
 Scores_Evaluation/__pycache__
 Scores_Evaluation/clans_files_*
 Scores_Evaluation/*.clans
+Scores_Evaluation/*.conf
 Scores_Evaluation/blast_temp*
 Scores_Evaluation/datasets*
 Scores_Evaluation/structures*

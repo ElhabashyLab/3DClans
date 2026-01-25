@@ -1,5 +1,6 @@
 from io import StringIO
 import re
+from tracemalloc import start
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import MutableSeq
@@ -405,7 +406,8 @@ def download_fasta_record(uid: str, upi=None, region: tuple[int, int] | None = N
     """
     Download a FASTA record by accession from Uniprot and as a fallback from UniParc.
     If the record is downloaded from UniParc the initial uid is used as accession-id.
-    If the sequence is not found, it returns False.   
+    If the sequence is not found, it returns False.
+    If a region is provided, the sequence is truncated to that region and the record ID is modified accordingly.   
 
     Args:
         uid (str): UniProt accession.
@@ -424,6 +426,8 @@ def download_fasta_record(uid: str, upi=None, region: tuple[int, int] | None = N
             if response.status_code == 200 and response.text.startswith(">"):
                 fasta_io = StringIO(response.text)
                 record = next(SeqIO.parse(fasta_io, "fasta"))
+                if region:
+                    record = add_region_to_record(record, region)
                 return record
         except Exception as e:
             continue
@@ -659,11 +663,10 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict[str, tuple[int
         uids_to_upis = uniprot_accessions_to_uniparc_accessions(uids)
         for uid, region in uids_with_regions.items():
             upi = uids_to_upis.get(uid)
-            downloaded_record = download_fasta_record(uid, upi, region)
-            if isinstance(downloaded_record, SeqRecord):
-                downloaded_record.id = uid
-                record_with_region = add_region_to_record(downloaded_record, region)
-                records.append(record_with_region)
+            downloaded_record_with_region = download_fasta_record(uid, upi, region)
+            if isinstance(downloaded_record_with_region, SeqRecord):
+                downloaded_record_with_region.id = uid
+                records.append(downloaded_record_with_region)
             else:
                 fallback_record = create_mok_up_record(uid, region)
                 records.append(fallback_record)
@@ -693,7 +696,7 @@ def create_mok_up_record(uid: str, region: tuple[int, int] | None) -> SeqRecord:
 
 def add_region_to_record(record: SeqRecord, region: tuple[int, int] | None) -> SeqRecord:
     """
-    Takes a SeqRecord and modifies its ID ans Sequence to include the region if provided.
+    Takes a SeqRecord and modifies its ID and Sequence to include the region if provided.
 
     Args:
         record (SeqRecord): The record to modify.
@@ -705,6 +708,14 @@ def add_region_to_record(record: SeqRecord, region: tuple[int, int] | None) -> S
     if region is None:
         region_str = ""
     else:
+        if record.seq is None:
+            raise ValueError(f"Record {record.id} has no sequence to extract region from.")
+        seq_len = len(record.seq)
+        start, end = region
+        if start < 1 or end > seq_len or start > end:
+            raise ValueError(
+                f"Invalid region {region} for record {record.id} with length {seq_len}")
+            
         region_str = f"/{int(region[0])}-{int(region[1])}"
         record = record[region[0]-1 : region[1]]
     record.id = f"{record.id}{region_str}"
