@@ -12,6 +12,12 @@ from scipy.spatial.distance import pdist
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.cluster import DBSCAN
+import networkx as nx
+import pandas as pd
+import igraph as ig
+import leidenalg as lg
+
 
 
 class ScoresEvaluator:
@@ -252,11 +258,8 @@ class ScoresEvaluator:
         Returns:
             None
         """
-        # Convert to pandas Series if needed
         data_x = pd.Series(data_x)
         data_y = pd.Series(data_y)
-
-        # Basic sanity check
         if len(data_x) != len(data_y):
             raise ValueError("data_x and data_y must have the same length.")
 
@@ -270,8 +273,8 @@ class ScoresEvaluator:
 
         plt.figure(figsize=(6, 6))
         sns.scatterplot(x=data_x, y=data_y, alpha=0.7, edgecolor=None)
-
-        # Plot identity line y=x for reference
+        
+        # Plot identity line y=x
         min_val = min(data_x.min(), data_y.min())
         max_val = max(data_x.max(), data_y.max())
         plt.plot([min_val, max_val], [min_val, max_val], linestyle='--', color='gray', alpha=0.5)
@@ -288,6 +291,100 @@ class ScoresEvaluator:
             plt.show()
             
             
-    def find_clusters(self):
-        pass
+    def find_clusters_density_based(self, df_coord: pd.DataFrame,coord_type: str, eps: float = 0.5, min_samples: int = 5) -> pd.DataFrame:
+        """
+        Performs density-based clustering (DBSCAN) on 3D CLANS coordinates.
+
+        Args:
+            df_coord (pd.DataFrame):
+                DataFrame containing coordinates. Must include columns:
+                - Sequence_ID, x_<coord_type>, y_<coord_type>, z_<coord_type>
+            coord_type (str):
+                Identifier for which coordinate set to cluster.
+                Example: "struct" or "seq"
+            eps (float):
+                Maximum distance between two points to be considered neighbors.
+            min_samples (int):
+                Minimum number of points required to form a dense region.
+
+        Returns:
+            pd.DataFrame:
+                DataFrame with columns: [Sequence_ID, cluster_id_<coord_type>]
+
+                Noise points are labeled as -1.
+        """
+        required_cols = ["Sequence_ID", f"x_{coord_type}", f"y_{coord_type}", f"z_{coord_type}"]
+        missing = [c for c in required_cols if c not in df_coord.columns]
+        if missing:
+            raise ValueError(
+                f"Missing required columns for coord_type='{coord_type}': {missing}"
+            )
+        coords = df_coord[required_cols[1:]].to_numpy(dtype=float)
+        dbscan = DBSCAN(eps=eps, min_samples=min_samples)
+        labels = dbscan.fit_predict(coords)
+        df_out = pd.DataFrame({
+            "Sequence_ID": df_coord["Sequence_ID"],
+            f"cluster_id_{coord_type}_DBSCAN": labels
+            })
+        return df_out
+
+
+    def build_similarity_graph(self, df_scores: pd.DataFrame, score_col: str, threshold: float | None = None) -> nx.Graph:
+        """
+        Builds a weighted similarity graph from pairwise scores.
+
+        Args:
+            df_scores (pd.DataFrame): columns = [Sequence_ID_1, Sequence_ID_2, score_col]
+            score_col (str): column with similarity score (Bigger should mean more similar)
+            threshold (float): optional minimum score cutoff
+
+        Returns:
+            networkx.Graph
+        """
+        G = nx.Graph()
+        for _, row in df_scores.iterrows():
+            weight = row[score_col]
+            if threshold is not None:
+                if weight < threshold:
+                    continue
+            G.add_edge(
+                row["Sequence_ID_1"],
+                row["Sequence_ID_2"],
+                weight=weight
+            )
+        return G
+
+
+    def find_clusters_graph_based(self, df_scores: pd.DataFrame, scores_col: str, resolution: float = 1.0) -> pd.DataFrame:
+        """
+        Find clusters in a graph using Leiden community detection.
+        The graph is built from similarity scores.
+
+        Args:
+            df_scores (pd.DataFrame): DataFrame containing pairwise similarity scores with columns:
+                ["Sequence_ID_1", "Sequence_ID_2", Score_<scores_type>]
+            scores_col (str): Name of the column containing the similarity scores
+            resolution (float): Controls cluster granularity 
+                (small -> few big clusters, big -> many small clusters)
+
+        Returns:
+            pd.DataFrame: DataFrame with columns ["Sequence_ID", "cluster_id_<scores_type>"]
+        """
+        G = self.build_similarity_graph(df_scores, scores_col)
+        # Convert NetworkX graph to igraph
+        g_ig = ig.Graph.from_networkx(G)
+        g_ig.vs["name"] = list(G.nodes)
+        # Run Leiden community detection
+        partition = lg.find_partition(
+            g_ig,
+            lg.RBConfigurationVertexPartition,
+            weights="weight",
+            resolution_parameter=resolution
+        )
+        clusters_dict = {g_ig.vs[i]["name"]: cid for i, cid in enumerate(partition.membership)}
+        cluster_id_col_name = f"cluster_id_{scores_col}_Leiden"
+        df_out = pd.DataFrame.from_dict(clusters_dict, orient="index", columns=[cluster_id_col_name])
+        df_out.index.name = "Sequence_ID"
+        df_out.reset_index(inplace=True)
+        return df_out
     
