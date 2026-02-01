@@ -3,6 +3,7 @@
 .venv
 __pycache__/
 .vscode/*
+.github/
 
 Foldseek_working_dir
 TMalign_working_dir

@@ -13,10 +13,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import DBSCAN
+from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
 import networkx as nx
 import pandas as pd
 import igraph as ig
 import leidenalg as lg
+from hdbscan import HDBSCAN
 
 
 
@@ -289,11 +291,19 @@ class ScoresEvaluator:
             plt.close()
         else:
             plt.show()
-            
-            
-    def find_clusters_density_based(self, df_coord: pd.DataFrame,coord_type: str, eps: float = 0.5, min_samples: int = 5) -> pd.DataFrame:
+        
+        
+    def find_clusters_density_based(
+        self, 
+        df_coord: pd.DataFrame,
+        coord_type: str, 
+        algorithm: str = "HDBSCAN",
+        eps: float = 0.5, 
+        min_samples: int = 5,
+        min_cluster_size: int = 5
+    ) -> pd.DataFrame:
         """
-        Performs density-based clustering (DBSCAN) on 3D CLANS coordinates.
+        Performs density-based clustering on 3D CLANS coordinates using DBSCAN or HDBSCAN.
 
         Args:
             df_coord (pd.DataFrame):
@@ -302,16 +312,27 @@ class ScoresEvaluator:
             coord_type (str):
                 Identifier for which coordinate set to cluster.
                 Example: "struct" or "seq"
+            algorithm (str):
+                Clustering algorithm to use: "DBSCAN" or "HDBSCAN".
+                Default is "HDBSCAN" (recommended for most cases).
             eps (float):
                 Maximum distance between two points to be considered neighbors.
+                Only used for DBSCAN. Default is 0.5.
             min_samples (int):
-                Minimum number of points required to form a dense region.
+                Minimum number of points required to form a dense region (DBSCAN)
+                or minimum samples in neighborhood (HDBSCAN).
+                Default is 5.
+            min_cluster_size (int):
+                Minimum number of points required to form a cluster.
+                Only used for HDBSCAN. Default is 5.
 
         Returns:
             pd.DataFrame:
-                DataFrame with columns: [Sequence_ID, cluster_id_<coord_type>]
-
+                DataFrame with columns: [Sequence_ID, cluster_id_<coord_type>_<algorithm>]
                 Noise points are labeled as -1.
+
+        Raises:
+            ValueError: If required columns are missing or invalid algorithm specified.
         """
         required_cols = ["Sequence_ID", f"x_{coord_type}", f"y_{coord_type}", f"z_{coord_type}"]
         missing = [c for c in required_cols if c not in df_coord.columns]
@@ -320,12 +341,26 @@ class ScoresEvaluator:
                 f"Missing required columns for coord_type='{coord_type}': {missing}"
             )
         coords = df_coord[required_cols[1:]].to_numpy(dtype=float)
-        dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-        labels = dbscan.fit_predict(coords)
+        
+        if algorithm.upper() == "DBSCAN":
+            clusterer = DBSCAN(eps=eps, min_samples=min_samples)
+            labels = clusterer.fit_predict(coords)
+            algo_name = "DBSCAN"
+        elif algorithm.upper() == "HDBSCAN":
+            clusterer = HDBSCAN(
+                min_cluster_size=min_cluster_size,
+                min_samples=min_samples
+            )
+            labels = clusterer.fit_predict(coords)
+            algo_name = "HDBSCAN"
+        else:
+            raise ValueError(
+                f"Invalid algorithm '{algorithm}'. Must be 'DBSCAN' or 'HDBSCAN'."
+            )
         df_out = pd.DataFrame({
             "Sequence_ID": df_coord["Sequence_ID"],
-            f"cluster_id_{coord_type}_DBSCAN": labels
-            })
+            f"cluster_id_{coord_type}_{algo_name}": labels
+        })
         return df_out
 
 
@@ -387,4 +422,43 @@ class ScoresEvaluator:
         df_out.index.name = "Sequence_ID"
         df_out.reset_index(inplace=True)
         return df_out
+
+
+    def compute_clustering_agreement(self, df_cluster_labels: pd.DataFrame, 
+                                     cluster_col_1: str, cluster_col_2: str) -> dict:
+        """
+        Computes clustering agreement metrics (ARI and NMI) between two clustering results.
+        
+        Args:
+            df_cluster_labels (pd.DataFrame): DataFrame containing cluster labels with columns:
+                - Sequence_ID and at least two cluster assignment columns
+            cluster_col_1 (str): Name of the first cluster assignment column
+            cluster_col_2 (str): Name of the second cluster assignment column
+        
+        Returns:
+            dict: Dictionary containing:
+                - 'ARI': Adjusted Rand Index (range: -1 to 1, higher is better)
+                - 'NMI': Normalized Mutual Information (range: 0 to 1, higher is better)
+        
+        Raises:
+            ValueError: If specified columns are not found in the DataFrame
+        """
+        if cluster_col_1 not in df_cluster_labels.columns or cluster_col_2 not in df_cluster_labels.columns:
+            raise ValueError(f"Column '{cluster_col_1}' or '{cluster_col_2}' not found in DataFrame.")
+        
+        # Keep only points assigned to a cluster in both clusterings
+        df_valid = df_cluster_labels.loc[
+            (df_cluster_labels[cluster_col_1] != -1) & (df_cluster_labels[cluster_col_2] != -1),
+            [cluster_col_1, cluster_col_2]]
+
+        if df_valid.empty:
+            raise ValueError("No valid cluster assignments found (all points are noise).")
+
+        labels_1 = df_valid[cluster_col_1].to_numpy()
+        labels_2 = df_valid[cluster_col_2].to_numpy()
+
+        return {
+            "ARI": adjusted_rand_score(labels_1, labels_2),
+            "NMI": normalized_mutual_info_score(labels_1, labels_2)
+        }
     

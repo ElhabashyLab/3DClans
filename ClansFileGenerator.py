@@ -2,12 +2,10 @@ import io
 from pandas import DataFrame
 import pandas as pd
 from ClansFile import ClansFile
-import os
-from utils_for_structures_and_fasta import extract_uids_from_fasta, reset_dir_content
+from utils_for_structures_and_fasta import extract_uids_from_fasta
 import numpy as np
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-
 
 
 class ClansFileGenerator:
