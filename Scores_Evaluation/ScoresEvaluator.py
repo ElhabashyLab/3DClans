@@ -122,11 +122,10 @@ class ScoresEvaluator:
         """
         clans_file_generator = ClansFileGenerator()
         clans_file = clans_file_generator.parse_clans_file(clans_file_path)
-        df_scores = clans_file.scores
+        df_scores = clans_file.scores.copy()
         df_scores.columns = ["Sequence_ID_1", "Sequence_ID_2", "Score"]
         df_scores["Score_-log10"] = self.normalize_df_column(df_scores, "Score", "-log10")
-        coordinates = clans_file.coordinates
-        df_coord = pd.DataFrame(coordinates, columns=["Sequence_ID", "x", "y", "z"])
+        df_coord = pd.DataFrame(clans_file.coordinates, columns=["Sequence_ID", "x", "y", "z"])
         return df_scores, df_coord
     
     
