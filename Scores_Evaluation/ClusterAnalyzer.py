@@ -301,3 +301,62 @@ class ClusterAnalyzer:
                 })
 
         return pd.DataFrame(results)
+    
+    
+    def compute_cluster_statistics(
+        self,
+        df_cluster_labels: pd.DataFrame,
+        cluster_col: str,
+        df_distances: pd.DataFrame,
+        distance_col: str,
+        df_scores: pd.DataFrame,
+        score_col: str
+    ) -> pd.DataFrame:
+        """
+        Computes mean euclidean distance and mean similarity score for each cluster.
+        
+        Args:
+            df_cluster_labels (pd.DataFrame): DataFrame with columns [Sequence_ID, <cluster_col>]
+            cluster_col (str): Name of the cluster assignment column
+            df_distances (pd.DataFrame): DataFrame with columns [Sequence_ID_1, Sequence_ID_2, <distance_col>]
+            distance_col (str): Name of the euclidean distance column
+            df_scores (pd.DataFrame): DataFrame with columns [Sequence_ID_1, Sequence_ID_2, <score_col>]
+            score_col (str): Name of the similarity score column
+        
+        Returns:
+            pd.DataFrame: DataFrame with columns [Cluster_ID, num_sequences, mean_distance, mean_score]
+        """
+        if cluster_col not in df_cluster_labels.columns:
+            raise ValueError(f"Column '{cluster_col}' not found in cluster labels DataFrame.")
+        
+        # Filter out noise points
+        df_valid = df_cluster_labels[df_cluster_labels[cluster_col] != -1].copy()
+        if df_valid.empty:
+            raise ValueError("No valid cluster assignments found (all points are noise).")
+        
+        results = []
+        for cluster_id, group in df_valid.groupby(cluster_col):
+            seq_ids = set(group["Sequence_ID"])
+            num_sequences = len(seq_ids)
+            
+            # Extract pairwise distances within this cluster
+            cluster_distances = df_distances[
+                (df_distances["Sequence_ID_1"].isin(seq_ids)) &
+                (df_distances["Sequence_ID_2"].isin(seq_ids))
+            ]
+            mean_distance = cluster_distances[distance_col].mean() if not cluster_distances.empty else None
+            # Extract pairwise scores within this cluster
+            cluster_scores = df_scores[
+                (df_scores["Sequence_ID_1"].isin(seq_ids)) &
+                (df_scores["Sequence_ID_2"].isin(seq_ids))
+            ]            
+            mean_score = cluster_scores[score_col].mean() if not cluster_scores.empty else None
+            
+            results.append({
+                "Cluster_ID": cluster_id,
+                "num_sequences": num_sequences,
+                "mean_distance": mean_distance,
+                "mean_score": mean_score
+            })
+        
+        return pd.DataFrame(results)
