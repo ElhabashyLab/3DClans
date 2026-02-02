@@ -302,6 +302,92 @@ class ClusterAnalyzer:
 
         return pd.DataFrame(results)
     
+    def compute_overlap_coefficient(
+        self,
+        df_cluster_labels: pd.DataFrame,
+        cluster_col_1: str,
+        cluster_col_2: str,
+        drop_zero: bool = False
+    ) -> pd.DataFrame:
+        """
+        Computes the overlap coefficient (Szymkiewicz-Simpson coefficient) between all clusters 
+        of 2 clustering results. The overlap coefficient is defined as:
+        
+        overlap(A,B) = |A ∩ B| / min(|A|, |B|)
+        
+        This metric equals 1 when one cluster is a complete subset of the other, making it 
+        ideal for detecting subset relationships between clusters.
+
+        Args:
+            df_cluster_labels (pd.DataFrame): DataFrame containing cluster labels with columns:
+                - Sequence_ID and at least two cluster assignment columns
+            cluster_col_1 (str): name of the first cluster assignment column
+            cluster_col_2 (str): name of the second cluster assignment column
+            drop_zero (bool): If True, exclude cluster pairs with overlap coefficient 0 
+                from the output. Default is False.
+
+        Returns:
+            pd.DataFrame: DataFrame containing the overlap coefficient between all clusters 
+                of the two clusterings with columns [Cluster_i, Cluster_j, OverlapCoefficient, is_smaller].
+                The 'is_smaller' column indicates which cluster has fewer sequences:
+                - Column name from cluster_col_1 if the first cluster is smaller
+                - Column name from cluster_col_2 if the second cluster is smaller
+                - "Equal" if both clusters have the same size
+        """
+        if cluster_col_1 not in df_cluster_labels.columns or cluster_col_2 not in df_cluster_labels.columns:
+            raise ValueError(
+                f"Column '{cluster_col_1}' or '{cluster_col_2}' not found in DataFrame."
+            )
+
+        # Filter out noise points
+        df_valid = df_cluster_labels.loc[
+            (df_cluster_labels[cluster_col_1] != -1)
+            & (df_cluster_labels[cluster_col_2] != -1),
+            ["Sequence_ID", cluster_col_1, cluster_col_2],
+        ]
+        if df_valid.empty:
+            raise ValueError("No valid cluster assignments found (all points are noise).")
+        
+        # Assign sequences to clusters
+        clusters_1 = {
+            cid: set(group["Sequence_ID"])
+            for cid, group in df_valid.groupby(cluster_col_1)
+        }
+        clusters_2 = {
+            cid: set(group["Sequence_ID"])
+            for cid, group in df_valid.groupby(cluster_col_2)
+        }
+        
+        # Compute overlap coefficient for all cluster pairs
+        results = []
+        for c1, set_1 in clusters_1.items():
+            for c2, set_2 in clusters_2.items():
+                if c1 == c2:
+                    continue
+                intersection = len(set_1 & set_2)
+                min_size = min(len(set_1), len(set_2))
+                overlap_coef = intersection / min_size if min_size > 0 else 0.0
+                
+                if drop_zero and overlap_coef == 0.0:
+                    continue
+                
+                # Determine which cluster is smaller
+                if len(set_1) < len(set_2):
+                    is_smaller = cluster_col_1
+                elif len(set_2) < len(set_1):
+                    is_smaller = cluster_col_2
+                else:
+                    is_smaller = "Equal"
+                
+                results.append({
+                    cluster_col_1: c1,
+                    cluster_col_2: c2,
+                    "OverlapCoefficient": overlap_coef,
+                    "is_smaller": is_smaller
+                })
+
+        return pd.DataFrame(results)
+    
     
     def compute_cluster_statistics(
         self,
