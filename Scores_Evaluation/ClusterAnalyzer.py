@@ -204,6 +204,58 @@ class ClusterAnalyzer:
         
         return df_valid
     
+    @staticmethod
+    def _prepare_cluster_sets(
+        df_valid: pd.DataFrame,
+        cluster_col_1: str,
+        cluster_col_2: str
+    ) -> tuple[dict, dict]:
+        """
+        Creates dictionaries mapping cluster IDs to sets of sequence IDs for two clustering results.
+        
+        Args:
+            df_valid (pd.DataFrame): DataFrame with columns [Sequence_ID, cluster_col_1, cluster_col_2]
+            cluster_col_1 (str): First cluster assignment column
+            cluster_col_2 (str): Second cluster assignment column
+        
+        Returns:
+            tuple: Two dictionaries mapping cluster IDs to sets of sequence IDs
+        """
+        clusters_1 = {
+            cid: set(group["Sequence_ID"])
+            for cid, group in df_valid.groupby(cluster_col_1)
+        }
+        clusters_2 = {
+            cid: set(group["Sequence_ID"])
+            for cid, group in df_valid.groupby(cluster_col_2)
+        }
+        return clusters_1, clusters_2
+    
+    def _validate_and_prepare_clusters(
+        self,
+        df_cluster_labels: pd.DataFrame,
+        cluster_col_1: str,
+        cluster_col_2: str
+    ) -> tuple[pd.DataFrame, dict, dict]:
+        """
+        Validates columns, filters noise, and prepares cluster sets in one call.
+        
+        Returns:
+            tuple: (df_valid, clusters_1, clusters_2)
+        """
+        self._validate_columns(df_cluster_labels, cluster_col_1, cluster_col_2)
+        df_valid = df_cluster_labels.loc[
+            (df_cluster_labels[cluster_col_1] != -1) &
+            (df_cluster_labels[cluster_col_2] != -1),
+            ["Sequence_ID", cluster_col_1, cluster_col_2]
+        ].copy()
+        
+        if df_valid.empty:
+            raise ValueError("No valid cluster assignments found (all points are noise).")
+        
+        clusters_1, clusters_2 = self._prepare_cluster_sets(df_valid, cluster_col_1, cluster_col_2)
+        return df_valid, clusters_1, clusters_2
+    
     def compute_clustering_agreement(
         self, 
         df_cluster_labels: pd.DataFrame, 
@@ -228,11 +280,7 @@ class ClusterAnalyzer:
             ValueError: If specified columns are not found in the DataFrame
         """
         self._validate_columns(df_cluster_labels, cluster_col_1, cluster_col_2)
-        
-        # Keep only points assigned to a cluster in both clusterings
         df_valid = self._filter_noise_points(df_cluster_labels, cluster_col_1, cluster_col_2)
-        
-        # Select only the relevant columns for comparison
         df_valid = df_valid[[cluster_col_1, cluster_col_2]]
         
         labels_1 = df_valid[cluster_col_1].to_numpy()
@@ -263,28 +311,10 @@ class ClusterAnalyzer:
             pd.DataFrame: DataFrame containing the Jaccard index between all clusters of the two clusterings
                 with columns [Cluster_i, Cluster_j, JaccardIndex].
         """
-        if cluster_col_1 not in df_cluster_labels.columns or cluster_col_2 not in df_cluster_labels.columns:
-            raise ValueError(
-                f"Column '{cluster_col_1}' or '{cluster_col_2}' not found in DataFrame."
-            )
-
-        # Filter out noise points
-        df_valid = df_cluster_labels.loc[
-            (df_cluster_labels[cluster_col_1] != -1)
-            & (df_cluster_labels[cluster_col_2] != -1),
-            ["Sequence_ID", cluster_col_1, cluster_col_2],
-        ]
-        if df_valid.empty:
-            raise ValueError("No valid cluster assignments found (all points are noise).")
-        # Assign sequences to clusters
-        clusters_1 = {
-            cid: set(group["Sequence_ID"])
-            for cid, group in df_valid.groupby(cluster_col_1)
-        }
-        clusters_2 = {
-            cid: set(group["Sequence_ID"])
-            for cid, group in df_valid.groupby(cluster_col_2)
-        }
+        df_valid, clusters_1, clusters_2 = self._validate_and_prepare_clusters(
+            df_cluster_labels, cluster_col_1, cluster_col_2
+        )
+        
         # Compute Jaccard index for all cluster pairs
         results = []
         for c1, set_1 in clusters_1.items():
@@ -334,29 +364,9 @@ class ClusterAnalyzer:
                 - Column name from cluster_col_2 if the second cluster is smaller
                 - "Equal" if both clusters have the same size
         """
-        if cluster_col_1 not in df_cluster_labels.columns or cluster_col_2 not in df_cluster_labels.columns:
-            raise ValueError(
-                f"Column '{cluster_col_1}' or '{cluster_col_2}' not found in DataFrame."
-            )
-
-        # Filter out noise points
-        df_valid = df_cluster_labels.loc[
-            (df_cluster_labels[cluster_col_1] != -1)
-            & (df_cluster_labels[cluster_col_2] != -1),
-            ["Sequence_ID", cluster_col_1, cluster_col_2],
-        ]
-        if df_valid.empty:
-            raise ValueError("No valid cluster assignments found (all points are noise).")
-        
-        # Assign sequences to clusters
-        clusters_1 = {
-            cid: set(group["Sequence_ID"])
-            for cid, group in df_valid.groupby(cluster_col_1)
-        }
-        clusters_2 = {
-            cid: set(group["Sequence_ID"])
-            for cid, group in df_valid.groupby(cluster_col_2)
-        }
+        df_valid, clusters_1, clusters_2 = self._validate_and_prepare_clusters(
+            df_cluster_labels, cluster_col_1, cluster_col_2
+        )
         
         # Compute overlap coefficient for all cluster pairs
         results = []
@@ -446,3 +456,43 @@ class ClusterAnalyzer:
             })
         
         return pd.DataFrame(results)
+    
+    
+    def get_cluster_counts(
+        self,
+        df_cluster_labels: pd.DataFrame,
+        cluster_col: str
+    ) -> dict[str, int]:
+        """
+        Returns the number of clusters (excluding noise) and number of noise points 
+        for a given clustering column.
+        
+        Args:
+            df_cluster_labels (pd.DataFrame): DataFrame with cluster assignments
+            cluster_col (str): Name of the cluster assignment column
+        
+        Returns:
+            dict: Dictionary with keys:
+                - 'num_clusters': Number of unique clusters (excluding noise label -1)
+                - 'num_noise': Number of sequences classified as noise (label -1)
+                - 'num_clustered': Number of sequences assigned to clusters (not noise)
+        """
+        if cluster_col not in df_cluster_labels.columns:
+            raise ValueError(f"Column '{cluster_col}' not found in DataFrame.")
+        
+        labels = df_cluster_labels[cluster_col]
+        
+        # Count unique clusters (excluding -1 for noise)
+        unique_clusters = labels[labels != -1].nunique()
+        
+        # Count noise points
+        num_noise = (labels == -1).sum()
+        
+        # Count clustered points
+        num_clustered = (labels != -1).sum()
+        
+        return {
+            'num_clusters': int(unique_clusters),
+            'num_noise': int(num_noise),
+            'num_clustered': int(num_clustered)
+        }
