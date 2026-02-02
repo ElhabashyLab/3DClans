@@ -372,8 +372,6 @@ class ClusterAnalyzer:
         results = []
         for c1, set_1 in clusters_1.items():
             for c2, set_2 in clusters_2.items():
-                if c1 == c2:
-                    continue
                 intersection = len(set_1 & set_2)
                 min_size = min(len(set_1), len(set_2))
                 overlap_coef = intersection / min_size if min_size > 0 else 0.0
