@@ -7,6 +7,7 @@ from ToolType import ToolType
 from ClansFileGenerator import ClansFileGenerator
 from InputFileType import InputFileType
 from ConfigFile import ConfigFile
+from dependency_checks import verify_tool_dependencies
 
 
 def _set_up_parser() -> argparse.ArgumentParser:
@@ -72,6 +73,8 @@ def main():
     # parse merged arguments
     parser = _set_up_parser()
     args = parser.parse_args(merged_argv)
+    # check dependencies for the selected tool
+    verify_tool_dependencies(ToolType(args.tool))
     # process input file and create clans file
     input_file = args.load
     clans_file_path, cleaned_input_file_path = create_clans_file(
