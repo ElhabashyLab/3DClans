@@ -2,6 +2,7 @@ from USalign import USalign
 from TMalign import TMalign
 from Foldseek import Foldseek
 from ToolType import ToolType
+from StructSimTool import StructSimTool
 import os
 
 
@@ -14,7 +15,6 @@ class StructSimComputer:
         Sets up a tool to compute structural similarities between protein structures.
         """
         self.foldseek_score = foldseek_score
-        self.tools = self._set_up_tools()
         self.results = {}    
 
 
@@ -22,25 +22,31 @@ class StructSimComputer:
         """
         Run the specified tool on the PDB directory.
         """
-        for tool in self.tools:
-            if tool.name == tool_type.value:
-                print(f"Computing structural similarity with {tool.name}...")
-                num_structures = len(os.listdir(pdb_dir))
-                # small Gaus without the biggest factor of the sum 
-                expected_number_of_scores = (num_structures * (num_structures + 1) // 2) - num_structures
-                scores = tool.start_run(pdb_dir)
-                if scores is None or len(scores) != expected_number_of_scores:
-                    if scores is None:
-                        len_scores = 0
-                    else:
-                        len_scores = len(scores)
-                    print(f"Warning: {tool.name} did not return the expected number of scores. Expected {expected_number_of_scores}, got {len_scores}.")
-                print(f"Structural similarity computation with {tool.name} completed.")
-                return scores
+        tool = self._create_tool(tool_type)
+        print(f"Computing structural similarity with {tool.name}...")
+        num_structures = len(os.listdir(pdb_dir))
+        expected_number_of_scores = (num_structures * (num_structures + 1) // 2) - num_structures
+        scores = tool.start_run(pdb_dir)
+        if scores is None or len(scores) != expected_number_of_scores:
+            if scores is None:
+                len_scores = 0
             else:
-                continue
-        # if no tool matches the tool_type, raise an error
-        raise ValueError(f"Tool {tool_type.value} is not available.")
+                len_scores = len(scores)
+            print(f"Warning: {tool.name} did not return the expected number of scores. Expected {expected_number_of_scores}, got {len_scores}.")
+        print(f"Structural similarity computation with {tool.name} completed.")
+        return scores
+        
+
+    def _create_tool(self, tool_type: ToolType) -> StructSimTool:
+        """Factory method to create the appropriate tool instance."""
+        if tool_type == ToolType.FOLDSEEK:
+            return Foldseek(self.foldseek_score)
+        elif tool_type == ToolType.USALIGN:
+            return USalign()
+        elif tool_type == ToolType.TMALIGN:
+            return TMalign()
+        else:
+            raise ValueError(f"Tool {tool_type.value} is not available.")
 
 
     def _set_up_tools(self):
