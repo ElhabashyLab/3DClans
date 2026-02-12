@@ -3,7 +3,7 @@ import os
 import pandas as pd
 from ClansFileGenerator import ClansFileGenerator
 from InputFileType import InputFileType
-from utils_for_structures_and_fasta import extract_uid_from_recordID
+from fasta_utils import extract_uid_from_recordID
 from ConfigFile import ConfigFile
         
 

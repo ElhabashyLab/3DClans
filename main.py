@@ -1,7 +1,8 @@
 import sys
 import argparse
 import os
-from utils_for_structures_and_fasta import *
+from structure_utils import fetch_pdbs
+from fasta_utils import generate_fasta_from_uids_with_regions
 from StructSimComputer import StructSimComputer
 from ToolType import ToolType
 from ClansFileGenerator import ClansFileGenerator
@@ -126,17 +127,18 @@ def create_clans_file(
     Returns:
         (str, str): Path to generated clans file and path to cleaned input file as fasta.
     """
+    scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
     uids_with_regions = fetch_pdbs(input_file_path, input_file_type, structures_dir)
+    scores = scores_computer.run(selected_tool, structures_dir)
+    
     input_file_name = os.path.basename(input_file_path).split(".")[0]
-    input_file_dir = os.path.dirname(input_file_path)
     os.makedirs("input_file_storage", exist_ok=True)
     cleaned_input_file_path = os.path.join("input_file_storage", f"{input_file_name}_cleaned.fasta")
     if input_file_type == InputFileType.FASTA:
         cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path, input_file_path)
     else:
         cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path)
-    scores_computer = _set_up_scores_computer(selected_tool, foldseek_score)
-    scores = scores_computer.run(selected_tool, structures_dir)
+    
     clans_generator = ClansFileGenerator()
     input_file_cleaned_name = os.path.basename(cleaned_input_file_path).split(".")[0]
     out_path = os.path.join(out_dir_path, f"{input_file_cleaned_name}.clans")

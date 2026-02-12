@@ -47,14 +47,3 @@ class StructSimComputer:
             return TMalign()
         else:
             raise ValueError(f"Tool {tool_type.value} is not available.")
-
-
-    def _set_up_tools(self):
-        """
-        Sets up the StructSimTools.
-        """
-        tools = [foldseek := Foldseek(self.foldseek_score),
-                 usalign := USalign(),
-                 tmalign := TMalign()
-                 ]
-        return tools

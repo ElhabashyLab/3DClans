@@ -1,6 +1,6 @@
 import time
 import os
-from utils_for_structures_and_fasta import fetch_pdbs
+from structure_utils import fetch_pdbs
 from StructSimComputer import StructSimComputer
 from ToolType import ToolType
 from InputFileType import InputFileType

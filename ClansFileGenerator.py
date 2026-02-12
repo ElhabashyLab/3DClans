@@ -2,7 +2,7 @@ import io
 from pandas import DataFrame
 import pandas as pd
 from ClansFile import ClansFile
-from utils_for_structures_and_fasta import extract_uids_from_fasta, extract_uid_from_recordID
+from fasta_utils import extract_uids_from_fasta, extract_uid_from_recordID
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 

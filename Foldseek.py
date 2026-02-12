@@ -1,5 +1,5 @@
 from StructSimTool import StructSimTool
-from utils_for_structures_and_fasta import reset_dir_content
+from file_utils import reset_dir_content
 import subprocess
 import os
 import pandas as pd
@@ -52,6 +52,8 @@ class Foldseek(StructSimTool):
         (converting into readable output)
         foldseek convertalis <i:queryDb> <i:targetDb> <i:alignmentDB> <o:alignmentFile> [options][/+][-]
         """
+        # clean working directory before running
+        reset_dir_content(self.working_dir)
         # creating target_db = query_db
         self.db = self._create_database(pdb_dir, "foldseekDB")
         if not self.db:

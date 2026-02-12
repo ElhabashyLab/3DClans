@@ -2,7 +2,7 @@ from StructSimTool import StructSimTool
 import os
 import pandas as pd
 from io import StringIO
-from utils_for_structures_and_fasta import reset_dir_content
+from file_utils import reset_dir_content
 
 
 
@@ -23,6 +23,8 @@ class TMalign(StructSimTool):
         """
         Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run with the specified pdb_dir.
         """
+        # clean working directory before running
+        reset_dir_content(self.working_dir)
         # prepare files for TMalign
         pdb_files = os.listdir(pdb_dir)
         pdb_names_list = self.working_dir + "pdb_names.txt"

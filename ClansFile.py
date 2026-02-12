@@ -1,7 +1,7 @@
 import pandas as pd
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-from utils_for_structures_and_fasta import extract_uid_from_recordID
+from fasta_utils import extract_uid_from_recordID
 
 
 class ClansFile:
