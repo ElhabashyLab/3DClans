@@ -12,10 +12,6 @@ class Foldseek(StructSimTool):
     def __init__(self, score):
         description = "A tool for protein structure comparison using Foldseek."
         self.score = score
-        if os.path.exists("Foldseek_working_dir"):
-            reset_dir_content("Foldseek_working_dir")
-        else:
-            os.makedirs("Foldseek_working_dir")
         working_dir = "Foldseek_working_dir/"
         super().__init__("foldseek", description, working_dir)
         self.createdb = "createdb"  # command to create a database

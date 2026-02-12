@@ -1,4 +1,6 @@
 import subprocess
+import os
+from utils_for_structures_and_fasta import reset_dir_content
 
 
 class StructSimTool():
@@ -9,6 +11,7 @@ class StructSimTool():
         self.name = name
         self.description = description
         self.working_dir = working_dir
+        self._clean_working_dir()
         self.command = []
         self.output = None
         
@@ -19,6 +22,16 @@ class StructSimTool():
         This method should be overridden by subclasses to implement specific tool logic.
         """
         raise NotImplementedError("Subclasses should implement this method to run the tool.")
+    
+    
+    def _clean_working_dir(self):
+        """
+        Cleans the working directory by removing all files in it.
+        """
+        if os.path.exists(self.working_dir):
+            reset_dir_content(self.working_dir)
+        else:
+            os.makedirs(self.working_dir)
     
     
     def _execute_run(self):

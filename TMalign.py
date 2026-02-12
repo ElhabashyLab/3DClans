@@ -12,10 +12,6 @@ class TMalign(StructSimTool):
     """
     def __init__(self):
         description = "A tool for protein structure comparison using TMalign."
-        if os.path.exists("TMalign_working_dir"):
-            reset_dir_content("TMalign_working_dir")
-        else:
-            os.makedirs("TMalign_working_dir")
         working_dir = "TMalign_working_dir/"
         super().__init__("TMalign", description, working_dir)
         self.flag_dir = "-dir" # specifies the directory containing PDB files
