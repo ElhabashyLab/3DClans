@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clans3d"
+version = "0.1.0"
+description = "Generate CLANS visualization files from protein structures using pairwise structural similarity scores."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "ElhabashyLab" }
+]
+dependencies = [
+    "biopython>=1.80",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "scikit-learn>=1.2",
+    "hdbscan>=0.8",
+    "networkx>=3.0",
+    "python-igraph>=0.11",
+    "leidenalg>=0.9",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+    "requests>=2.28",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+clans3d = "clans3d.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"clans3d.legacy" = ["*.jar"]

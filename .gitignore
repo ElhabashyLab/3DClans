@@ -1,32 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
 /.idea/
 /venv/
-.venv
-__pycache__/
+.venv/
 .vscode/*
-.github/
 
-Foldseek_working_dir
-TMalign_working_dir
-USalign_working_dir
-input_file_storage
-PDBs
-structures
-structures_for_benchmark
-clans_files
-input_file_storage
+# Don't ignore copilot instructions
+!.github/
+!.github/copilot-instructions.md
 
-Dataset_Generator/psiblast_results.xml
-Dataset_Generator/__pycache__
+# Runtime directories (tool working dirs, structures, processed inputs)
+work/
 
-Scores_Evaluation/__pycache__
-Scores_Evaluation/clans_files_*
-Scores_Evaluation/*.clans
-Scores_Evaluation/*.conf
-Scores_Evaluation/blast_temp*
-Scores_Evaluation/datasets*
-Scores_Evaluation/structures*
-Scores_Evaluation/*_working_dir*
+# Output directory (generated CLANS files)
+output/
 
-recovered_clans/__pycache__/
-
-dbs/
+# Notebook checkpoints
+.ipynb_checkpoints/
