@@ -110,8 +110,8 @@ def create_clans_file(
     input_file_type: InputFileType,
     selected_tool: ToolType,
     foldseek_score: str | None,
-    structures_dir: str = "structures",
-    out_dir_path: str = "clans_files"
+    structures_dir: str = os.path.join("work", "structures"),
+    out_dir_path: str = os.path.join("output", "clans_files")
     ) -> tuple[str, str]:
     """
     Creates a clans file.
@@ -132,8 +132,12 @@ def create_clans_file(
     scores = scores_computer.run(selected_tool, structures_dir)
 
     input_file_name = os.path.basename(input_file_path).split(".")[0]
-    os.makedirs("input_file_storage", exist_ok=True)
-    cleaned_input_file_path = os.path.join("input_file_storage", f"{input_file_name}_cleaned.fasta")
+    
+    # Store processed inputs in work/input
+    input_storage_dir = os.path.join("work", "input_file_storage")
+    os.makedirs(input_storage_dir, exist_ok=True)
+    cleaned_input_file_path = os.path.join(input_storage_dir, f"{input_file_name}_cleaned.fasta")
+    
     if input_file_type == InputFileType.FASTA:
         cleaned_input_file_path = generate_fasta_from_uids_with_regions(uids_with_regions, cleaned_input_file_path, input_file_path)
     else:

@@ -11,7 +11,7 @@ class USalign(StructSimTool):
     """
     def __init__(self):
         description = "A tool for protein structure comparison using USalign."
-        working_dir = "USalign_working_dir/"
+        working_dir = os.path.join("work", "usalign")
         super().__init__("USalign", description, working_dir)
         self.flag_dir = "-dir" # specifies the directory containing PDB files
         self.flag_outfmt = "-outfmt" # specifies the output format
@@ -26,7 +26,7 @@ class USalign(StructSimTool):
         reset_dir_content(self.working_dir)        
         # prepare files for USalign
         pdb_files = os.listdir(pdb_dir)
-        pdb_names_list = self.working_dir + "pdb_names.txt"
+        pdb_names_list = os.path.join(self.working_dir, "pdb_names.txt")
         with open(pdb_names_list, 'w') as f:
             for pdb_name in pdb_files:
                 f.write(f"{pdb_name}\n")
