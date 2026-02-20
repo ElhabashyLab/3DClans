@@ -1,8 +1,13 @@
-from clans3d.similarity.struct_sim_tool import StructSimTool
+import logging
 import os
-import pandas as pd
 from io import StringIO
+
+import pandas as pd
+
+from clans3d.similarity.struct_sim_tool import StructSimTool
 from clans3d.utils.file_utils import reset_dir_content
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -55,8 +60,8 @@ class TMalign(StructSimTool):
                 df3['PDBchain2'] = df3['PDBchain2'].str.split(".").str[0]
                 return df3
             else:
-                print("Failed to parse output: DataFrame is empty.")
+                logger.error("Failed to parse output: DataFrame is empty.")
                 return False
         except Exception as e:
-            print(f"Error parsing output: {e}")
+            logger.error("Error parsing output: %s", e)
             return False

@@ -1,3 +1,4 @@
+import logging
 from io import StringIO
 import re
 from Bio import SeqIO
@@ -7,6 +8,8 @@ import requests
 import pandas as pd
 from clans3d.core.input_file_type import InputFileType
 from clans3d.utils.api_utils import uniprot_accessions_to_uniparc_accessions
+
+logger = logging.getLogger(__name__)
 
 
 def extract_uids_from_fasta(fasta_file):
@@ -202,7 +205,7 @@ def remove_non_existing_uniprot_accessions(uniprot_accessions: list[str]) -> lis
     for uid, upi in uids_to_upis.items():
         record = download_fasta_record(uid, upi=upi)
         if record is False:
-            print(f"Could not retrieve sequence for UID: {uid}")
+            logger.warning("Could not retrieve sequence for UID: %s", uid)
             uniprot_accessions.remove(uid)
     return uniprot_accessions
 
@@ -217,14 +220,14 @@ def filter_input_file(in_path: str, out_path: str, dataset_type: InputFileType):
         out_path (str): Path to the output file.
         dataset_type (InputFileType): Type of the input dataset file. Can be FASTA or TSV.
     """
-    print("Filtering...")
+    logger.debug("Filtering...")
     if dataset_type == InputFileType.FASTA:
-        print("Extracting uids ...")
+        logger.debug("Extracting uids...")
         uids = extract_uids_from_fasta(in_path)
         uids_filtered = remove_non_existing_uniprot_accessions(uids)
         copy_records_from_fasta(in_path, uids_filtered, out_path)
     elif dataset_type == InputFileType.TSV:
-        print("Extracting uids ...")
+        logger.debug("Extracting uids...")
         df = pd.read_csv(in_path, sep='\t')
         uids = df['entry'].tolist()
         uids_filtered = remove_non_existing_uniprot_accessions(uids)

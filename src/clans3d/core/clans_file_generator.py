@@ -1,10 +1,13 @@
 import io
+import logging
 from pandas import DataFrame
 import pandas as pd
 from clans3d.core.clans_file import ClansFile
 from clans3d.utils.fasta_utils import extract_uids_from_fasta, extract_uid_from_recordID
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
+
+logger = logging.getLogger(__name__)
 
 
 class ClansFileGenerator:
@@ -23,7 +26,7 @@ class ClansFileGenerator:
         Returns:
             ClansFile: A ClansFile object containing the parsed information.
         """
-        print(f"Parsing CLANS file {clans_file_path}...")
+        logger.info("Parsing CLANS file %s...", clans_file_path)
         with open(clans_file_path, 'r') as file:
             content = file.read()
         lines = [line.strip() for line in content.strip().splitlines() if line.strip()]
@@ -181,7 +184,7 @@ class ClansFileGenerator:
         Returns:
             The path to the generated CLANS file.
         """
-        print(f"Generating CLANS file {out_path}...")
+        logger.info("Generating CLANS file %s...", out_path)
         uids = extract_uids_from_fasta(path_to_fasta)
         scores = self._normalize_scores_format(scores, uids)
         self.length_of_fasta = len(uids)
@@ -196,7 +199,7 @@ class ClansFileGenerator:
         content = str(clans_file)
         with open(out_path, 'w') as file:
             file.write(content)
-        print(f"CLANS file generated at {out_path}")
+        logger.info("CLANS file generated at %s", out_path)
         return out_path
 
 

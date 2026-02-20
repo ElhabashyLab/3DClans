@@ -1,6 +1,9 @@
+import logging
 import shutil
 from typing import Optional
 from clans3d.similarity.tool_type import ToolType
+
+logger = logging.getLogger(__name__)
 
 
 def check_external_tool(tool_name: str) -> Optional[str]:
@@ -42,4 +45,4 @@ def verify_tool_dependencies(tool_type: ToolType) -> None:
             f"Installation instructions: [add relevant links]"
         )
     
-    print(f"Found {tool_name} at: {tool_path}")
+    logger.debug("Found %s at: %s", tool_name, tool_path)

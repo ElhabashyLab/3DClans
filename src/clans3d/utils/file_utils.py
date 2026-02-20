@@ -1,6 +1,9 @@
+import logging
 import os
 import shutil
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def download_file(url, output_path):
@@ -18,7 +21,7 @@ def download_file(url, output_path):
                 f.write(chunk)
         return True
     except Exception as e:
-        print(f"Failed to download {url}: {str(e)}")
+        logger.warning("Failed to download %s: %s", url, e)
         return False
     
 

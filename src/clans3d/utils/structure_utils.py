@@ -1,3 +1,4 @@
+import logging
 import os
 import requests
 import pandas as pd
@@ -9,6 +10,13 @@ from Bio.PDB.PDBIO import Select
 from clans3d.core.input_file_type import InputFileType
 from clans3d.utils.file_utils import download_file, reset_dir_content
 from clans3d.utils.fasta_utils import extract_uid_from_recordID, extract_region_from_record
+
+logger = logging.getLogger(__name__)
+
+
+def _log_interval(total: int) -> int:
+    """Return how often to log progress: every 10 items or every 20%, whichever is smaller."""
+    return max(1, min(10, total // 5))
 
 
 def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict[str, tuple[int, int] | None]:
@@ -26,7 +34,7 @@ def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir:
         dict (str, tuple[int, int] | None): Containing downloaded uids together with their regions.
     """    
     reset_dir_content(output_dir)
-    print(f"Downloading structure files in \"{output_dir}\"...")
+    logger.info("Downloading structure files...")
     if input_file_type is InputFileType.FASTA or input_file_type is InputFileType.A2M:
         return process_fasta_file(input_file_path, output_dir)
     elif input_file_type is InputFileType.TSV:
@@ -49,16 +57,23 @@ def process_fasta_file(input_file_path: str, output_dir: str) -> dict:
         dict: Containing downloaded uids together with their regions.
     """
     successful_downloads = 0
-    total_records = 0
     uids_with_regions = {}
-    for record in SeqIO.parse(input_file_path, "fasta"):
-        total_records += 1
+    records = list(SeqIO.parse(input_file_path, "fasta"))
+    total_records = len(records)
+    interval = _log_interval(total_records)
+    for idx, record in enumerate(records, 1):
         uid = extract_uid_from_recordID(record.id)
         region = extract_region_from_record(record)
         if download_alphafold_structure(uid, output_dir, region):
             uids_with_regions[uid] = region
             successful_downloads += 1
-    print(f"Downloaded {successful_downloads} from {total_records} PDB files successfully.")
+        if idx % interval == 0 or idx == total_records:
+            logger.info("Downloaded %d/%d structures...", idx, total_records)
+    failed = total_records - successful_downloads
+    if failed:
+        logger.info("Downloaded %d/%d PDB files (%d failed).", successful_downloads, total_records, failed)
+    else:
+        logger.info("Downloaded %d/%d PDB files.", successful_downloads, total_records)
     return uids_with_regions
 
 
@@ -79,7 +94,8 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
     successful_downloads = 0
     uids_with_regions = {}
     total_uids = len(df)
-    for _, row in df.iterrows():
+    interval = _log_interval(total_uids)
+    for idx, (_, row) in enumerate(df.iterrows(), 1):
         uid = row['entry']
         start: int = row['region_start']
         end: int = row['region_end']
@@ -90,7 +106,13 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
         if download_alphafold_structure(uid, output_dir, region):
             successful_downloads += 1
             uids_with_regions[uid] = region
-    print(f"Downloaded {successful_downloads} from {total_uids} PDB files successfully.")
+        if idx % interval == 0 or idx == total_uids:
+            logger.info("Downloaded %d/%d structures...", idx, total_uids)
+    failed = total_uids - successful_downloads
+    if failed:
+        logger.info("Downloaded %d/%d PDB files (%d failed).", successful_downloads, total_uids, failed)
+    else:
+        logger.info("Downloaded %d/%d PDB files.", successful_downloads, total_uids)
     return uids_with_regions
 
 
@@ -125,10 +147,10 @@ def download_alphafold_structure(
         response.raise_for_status()
         predictions = response.json()
     except Exception:
-        print(f"Failed to download {id} from {api_url}")
+        logger.warning("Failed to download %s from %s", id, api_url)
         return False
     if not predictions:
-        print(f"Failed to download {id} from {api_url}")
+        logger.warning("Failed to download %s from %s", id, api_url)
         return False
     
     model_info = predictions[0]
@@ -137,13 +159,13 @@ def download_alphafold_structure(
     else:
         structure_url = model_info.get("cifUrl")
     if not structure_url:
-        print(f"Failed to download {id} from {api_url}")
+        logger.warning("Failed to download %s from %s", id, api_url)
         return False
 
     path_to_structure = os.path.join(output_dir, f"{id}.{file_format}")
     success = download_file(structure_url, path_to_structure)
     if not success:
-        print(f"Failed to download {id} from {api_url}")
+        logger.warning("Failed to download %s from %s", id, api_url)
         return False
 
     if region:

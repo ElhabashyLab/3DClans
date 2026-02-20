@@ -11,6 +11,7 @@ Each step is exposed as a public method so callers (e.g. Benchmark)
 can invoke and time them independently.
 """
 
+import logging
 import os
 
 import pandas as pd
@@ -21,6 +22,9 @@ from clans3d.similarity.struct_sim_computer import StructSimComputer
 from clans3d.similarity.tool_type import ToolType
 from clans3d.utils.structure_utils import fetch_pdbs
 from clans3d.utils.fasta_utils import generate_fasta_from_uids_with_regions
+from clans3d.utils.log import setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineConfig:
@@ -31,6 +35,7 @@ class PipelineConfig:
         input_type: Format of the input file.
         tool: Structural similarity tool to use.
         foldseek_score: Score type for Foldseek ("evalue" or "TM"). Ignored for other tools.
+        verbose: If ``True``, enable debug-level logging output.
         structures_dir: Directory for downloaded PDB structures.
         output_dir: Directory for generated CLANS files.
         input_storage_dir: Directory for cleaned/intermediate input files.
@@ -42,6 +47,7 @@ class PipelineConfig:
         input_type: InputFileType,
         tool: ToolType,
         foldseek_score: str | None = None,
+        verbose: bool = False,
         structures_dir: str = os.path.join("work", "structures"),
         output_dir: str = os.path.join("output", "clans_files"),
         input_storage_dir: str = os.path.join("work", "input_file_storage"),
@@ -50,6 +56,7 @@ class PipelineConfig:
         self.input_type = input_type
         self.tool = tool
         self.foldseek_score = foldseek_score
+        self.verbose = verbose
         self.structures_dir = structures_dir
         self.output_dir = output_dir
         self.input_storage_dir = input_storage_dir
@@ -74,6 +81,8 @@ class ClansPipeline:
 
     def __init__(self, config: PipelineConfig):
         self.config = config
+        # Ensure logging is configured when used as a library (f.e. for benchmark)
+        setup_logging(verbose=config.verbose)
         self._validate()
 
     def _validate(self) -> None:

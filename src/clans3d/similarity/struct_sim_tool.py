@@ -1,5 +1,8 @@
+import logging
 import subprocess
 from clans3d.utils.file_utils import reset_dir_content
+
+logger = logging.getLogger(__name__)
 
 
 class StructSimTool():
@@ -34,7 +37,7 @@ class StructSimTool():
             self.output = result.stdout
             scores = self._parse_output()
         except subprocess.CalledProcessError as e:
-            print(f"Error running {self.name} with {self.command}: {e}")
+            logger.error("Error running %s with %s: %s", self.name, self.command, e)
             scores = None
         return scores
     

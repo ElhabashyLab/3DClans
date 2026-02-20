@@ -1,8 +1,13 @@
+import logging
+import os
+import subprocess
+
+import pandas as pd
+
 from clans3d.similarity.struct_sim_tool import StructSimTool
 from clans3d.utils.file_utils import reset_dir_content
-import subprocess
-import os
-import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 class Foldseek(StructSimTool):
@@ -77,9 +82,9 @@ class Foldseek(StructSimTool):
                                     check=True)
             return os.path.join(self.working_dir, db_name)
         except subprocess.CalledProcessError as e:
-            print(f"Error running {self.name} with {create_db_command}: {e}")
-            print(f"stdout: {e.stdout}")
-            print(f"stderr: {e.stderr}")
+            logger.error("Error running %s with %s: %s", self.name, create_db_command, e)
+            logger.debug("stdout: %s", e.stdout)
+            logger.debug("stderr: %s", e.stderr)
             return False
 
 
@@ -100,9 +105,9 @@ class Foldseek(StructSimTool):
             df1 = self._clean_scores(df)
             return df1
         except subprocess.CalledProcessError as e:
-            print(f"Error running {self.name} with {convertalis_command}: {e}")
-            print(f"stdout: {e.stdout}")
-            print(f"stderr: {e.stderr}")
+            logger.error("Error running %s with %s: %s", self.name, convertalis_command, e)
+            logger.debug("stdout: %s", e.stdout)
+            logger.debug("stderr: %s", e.stderr)
             return False
 
 

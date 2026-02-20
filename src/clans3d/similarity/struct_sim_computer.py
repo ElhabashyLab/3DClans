@@ -1,9 +1,13 @@
+import logging
+import os
+
 from clans3d.similarity.usalign import USalign
 from clans3d.similarity.tmalign import TMalign
 from clans3d.similarity.foldseek import Foldseek
 from clans3d.similarity.tool_type import ToolType
 from clans3d.similarity.struct_sim_tool import StructSimTool
-import os
+
+logger = logging.getLogger(__name__)
 
 
 class StructSimComputer:
@@ -23,7 +27,7 @@ class StructSimComputer:
         Run the specified tool on the PDB directory.
         """
         tool = self._create_tool(tool_type)
-        print(f"Computing structural similarity with {tool.name}...")
+        logger.info("Computing structural similarity with %s...", tool.name)
         num_structures = len(os.listdir(pdb_dir))
         expected_number_of_scores = (num_structures * (num_structures + 1) // 2) - num_structures
         scores = tool.start_run(pdb_dir)
@@ -32,8 +36,8 @@ class StructSimComputer:
                 len_scores = 0
             else:
                 len_scores = len(scores)
-            print(f"Warning: {tool.name} did not return the expected number of scores. Expected {expected_number_of_scores}, got {len_scores}.")
-        print(f"Structural similarity computation with {tool.name} completed.")
+            logger.warning("%s did not return the expected number of scores. Expected %d, got %d.", tool.name, expected_number_of_scores, len_scores)
+        logger.info("Structural similarity computation with %s completed.", tool.name)
         return scores
         
 

@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import os
 import pandas as pd
@@ -5,6 +6,8 @@ from clans3d.core.clans_file_generator import ClansFileGenerator
 from clans3d.core.input_file_type import InputFileType
 from clans3d.utils.fasta_utils import extract_uid_from_recordID
 from clans3d.core.config_file import ConfigFile
+
+logger = logging.getLogger(__name__)
 
 
 def run_clans_headless(config_file: ConfigFile, path_clans_executable: str):
@@ -21,7 +24,7 @@ def run_clans_headless(config_file: ConfigFile, path_clans_executable: str):
     for key, value in arguments.items():
         arguments_of_conf.append(f"-{key}")
         arguments_of_conf.append(str(value))
-    print("\nrunning with " + " ".join(arguments_of_conf))
+    logger.debug("Running with %s", " ".join(arguments_of_conf))
     args = ["java", "-Xmx4G", "-jar", path_clans_executable] + arguments_of_conf
     subprocess.run(args, check=True)
     return outfile
