@@ -60,3 +60,19 @@ class ConfigFile():
 
                 config[key] = value
         return config
+
+    def config_to_argv(self) -> list[str]:
+        """
+        Reads the configuration file and returns a list of argv-style strings.
+        Each entry is formatted as ``['--key', 'value', ...]`` so it can be
+        merged directly with ``sys.argv``.
+
+        Returns:
+            list[str]: Command-line argument strings derived from the config file.
+        """
+        config = self.read_config()
+        argv: list[str] = []
+        for key, value in config.items():
+            argv.append(f"--{key}")
+            argv.append(str(value))
+        return argv

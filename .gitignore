@@ -23,5 +23,8 @@ work/
 # Output directory (generated CLANS files)
 output/
 
+# Benchmark results
+benchmark_output/
+
 # Notebook checkpoints
 .ipynb_checkpoints/

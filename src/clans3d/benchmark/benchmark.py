@@ -8,50 +8,30 @@ Supported tools:
 - Foldseek (with evalue and TM score types)
 - USalign
 
-Usage:
-    Edit the __main__ block with your input file and run:
-    python -m clans3d.benchmark.benchmark
+See `docs/BENCHMARK_USAGE.md` for detailed usage instructions and example results.
 """
 
 import time
 import os
-from dataclasses import dataclass, asdict
 from datetime import datetime
 import pandas as pd
 
-from clans3d.utils.structure_utils import fetch_pdbs
-from clans3d.utils.fasta_utils import generate_fasta_from_uids_with_regions
-from clans3d.similarity.struct_sim_computer import StructSimComputer
+from clans3d.benchmark.benchmark_result import BenchmarkResult
+from clans3d.core.pipeline import ClansPipeline, PipelineConfig
 from clans3d.similarity.tool_type import ToolType
-from clans3d.core.clans_file_generator import ClansFileGenerator
 from clans3d.core.input_file_type import InputFileType
-
-
-@dataclass
-class BenchmarkResult:
-    """Results from a single tool benchmark run."""
-    tool: str                         # e.g., "Foldseek", "USalign"
-    score_type: str | None            # "evalue" or "TM" for Foldseek, None otherwise
-    num_structures: int               # Number of proteins processed
-    time_pdb_download: float          # Time to fetch PDB structures (seconds)
-    time_score_computation: float     # Time for similarity computation (seconds)
-    time_clans_generation: float      # Time to generate CLANS file (seconds)
-    time_total: float                 # Total end-to-end time (seconds)
-    num_scores: int                   # Number of pairwise scores computed
-    success: bool                     # Whether benchmark completed successfully
-    error_message: str | None = None  # Error details if failed
 
 
 class Benchmark:
     """
     Benchmark class for measuring performance of Clans-3D structural similarity tools.
     
-    This class orchestrates the full pipeline:
-    1. PDB structure download/retrieval
-    2. Similarity score computation
-    3. CLANS file generation
+    This class wraps :class:`ClansPipeline` and times each pipeline step
+    independently for detailed performance analysis.
     
-    Each stage is timed independently for detailed performance analysis.
+    Structures are downloaded and the cleaned FASTA is generated once during
+    initialization so that ``run_single_tool`` can be called directly without
+    any manual preparation.
     """
     
     def __init__(self, input_file: str, input_file_type: InputFileType, 
@@ -59,9 +39,12 @@ class Benchmark:
         """
         Initialize benchmark with input file.
         
+        Downloads PDB structures and generates the cleaned FASTA immediately
+        so that individual tool benchmarks can run without extra setup.
+        
         Args:
-            input_file: Path to input file (FASTA or TSV format)
-            input_file_type: Type of input file (InputFileType.FASTA or InputFileType.TSV)
+            input_file: Path to input file (FASTA, A2M, or TSV format)
+            input_file_type: Type of input file
             output_dir: Directory for benchmark outputs (default: "benchmark_output")
         """
         if not os.path.exists(input_file):
@@ -87,9 +70,33 @@ class Benchmark:
         
         # Store results
         self.results: list[BenchmarkResult] = []
-        self.uids_with_regions = None
-        self.cleaned_fasta_path = None
-        self.num_structures = 0
+        
+        # Download structures and generate cleaned FASTA upfront
+        self._init_pipeline = self._make_pipeline(ToolType.FOLDSEEK, None)
+        
+        print(f"Downloading PDB structures for {os.path.basename(input_file)}...")
+        start = time.perf_counter()
+        self.uids_with_regions = self._init_pipeline.fetch_structures()
+        self.num_structures = len([f for f in os.listdir(self.structures_dir) 
+                                  if f.endswith('.pdb') or f.endswith('.cif')])
+        self.cleaned_fasta_path = self._init_pipeline.generate_cleaned_fasta(
+            self.uids_with_regions
+        )
+        self.pdb_download_time = time.perf_counter() - start
+        print(f"Downloaded {self.num_structures} structures in {self.pdb_download_time:.2f}s")
+    
+    def _make_pipeline(self, tool: ToolType, score_type: str | None) -> ClansPipeline:
+        """Create a ClansPipeline for the given tool configuration."""
+        config = PipelineConfig(
+            input_file=self.input_file,
+            input_type=self.input_file_type,
+            tool=tool,
+            foldseek_score=score_type,
+            structures_dir=self.structures_dir,
+            output_dir=self.clans_dir,
+            input_storage_dir=self.work_dir,
+        )
+        return ClansPipeline(config)
     
     def run_all_tools(self) -> pd.DataFrame:
         """
@@ -106,49 +113,16 @@ class Benchmark:
         print(f"Output directory: {self.run_dir}")
         print(f"{'='*80}\n")
         
-        # Download PDBs once (shared across all tools)
-        print("Stage 1/3: Downloading PDB structures...")
-        start = time.perf_counter()
-        try:
-            self.uids_with_regions = fetch_pdbs(
-                self.input_file, 
-                self.input_file_type, 
-                self.structures_dir
-            )
-            self.num_structures = len([f for f in os.listdir(self.structures_dir) 
-                                      if f.endswith('.pdb') or f.endswith('.cif')])
-            pdb_download_time = time.perf_counter() - start
-            print(f"✓ Downloaded {self.num_structures} structures in {pdb_download_time:.2f}s\n")
-        except Exception as e:
-            print(f"✗ PDB download failed: {e}")
-            return self.get_results_df()
-        
-        # Create cleaned FASTA file (needed for CLANS generation)
-        input_file_name = os.path.basename(self.input_file).split(".")[0]
-        self.cleaned_fasta_path = os.path.join(self.work_dir, f"{input_file_name}_cleaned.fasta")
-        
-        if self.input_file_type == InputFileType.FASTA:
-            self.cleaned_fasta_path = generate_fasta_from_uids_with_regions(
-                self.uids_with_regions, 
-                self.cleaned_fasta_path, 
-                self.input_file
-            )
-        else:
-            self.cleaned_fasta_path = generate_fasta_from_uids_with_regions(
-                self.uids_with_regions, 
-                self.cleaned_fasta_path
-            )
-        
         # Run Foldseek with both score types
-        print("Stage 2/3: Running similarity tools...")
+        print("Running similarity tools...")
         print("-" * 80)
         
         for score_type in ["evalue", "TM"]:
-            result = self.run_single_tool(ToolType.FOLDSEEK, score_type, pdb_download_time)
+            result = self.run_single_tool(ToolType.FOLDSEEK, score_type)
             self.results.append(result)
         
         # Run USalign
-        result = self.run_single_tool(ToolType.USALIGN, None, pdb_download_time)
+        result = self.run_single_tool(ToolType.USALIGN, None)
         self.results.append(result)
         
         print("\n" + "="*80)
@@ -157,15 +131,16 @@ class Benchmark:
         
         return self.get_results_df()
     
-    def run_single_tool(self, tool_type: ToolType, score_type: str | None, 
-                       pdb_download_time: float) -> BenchmarkResult:
+    def run_single_tool(self, tool_type: ToolType, score_type: str | None) -> BenchmarkResult:
         """
         Run benchmark for a single tool configuration.
+        
+        Structures are already downloaded during initialization, so this
+        only measures score computation and CLANS file generation.
         
         Args:
             tool_type: Type of tool to benchmark
             score_type: Score type for Foldseek ("evalue" or "TM"), None for other tools
-            pdb_download_time: Time already spent downloading PDBs (reused across tools)
             
         Returns:
             BenchmarkResult: Results from this tool run
@@ -174,37 +149,26 @@ class Benchmark:
         score_label = f" ({score_type})" if score_type else ""
         print(f"\nBenchmarking: {tool_name}{score_label}")
         
+        pipeline = self._make_pipeline(tool_type, score_type)
+        
         try:
-            # Stage 2: Score Computation
+            # Score Computation
             print(f"  - Computing similarity scores...", end=" ", flush=True)
             start = time.perf_counter()
-            
-            computer = StructSimComputer(foldseek_score=score_type or "evalue")
-            scores = computer.run(tool_type, self.structures_dir)
-            
+            scores = pipeline.compute_scores()
             score_computation_time = time.perf_counter() - start
-            print(f"✓ ({score_computation_time:.2f}s)")
+            print(f"done ({score_computation_time:.2f}s)")
             
-            if scores is None or len(scores) == 0:
-                raise ValueError("No scores computed")
-            
-            # Stage 3: CLANS Generation
+            # CLANS Generation
             print(f"  - Generating CLANS file...", end=" ", flush=True)
             start = time.perf_counter()
-            
-            generator = ClansFileGenerator()
             output_name = f"{tool_name}_{score_type if score_type else 'default'}.clans"
-            out_path = os.path.join(self.clans_dir, output_name)
-            
-            if self.cleaned_fasta_path is None:
-                raise ValueError("Cleaned FASTA path not initialized")
-            
-            clans_path = generator.generate_clans_file(scores, self.cleaned_fasta_path, out_path)
-            
+            pipeline.generate_clans_file(scores, self.cleaned_fasta_path,
+                                         output_filename=output_name)
             clans_generation_time = time.perf_counter() - start
-            print(f"✓ ({clans_generation_time:.2f}s)")
+            print(f"done ({clans_generation_time:.2f}s)")
             
-            total_time = pdb_download_time + score_computation_time + clans_generation_time
+            total_time = self.pdb_download_time + score_computation_time + clans_generation_time
             
             print(f"  - Total: {total_time:.2f}s | Scores: {len(scores)}")
             
@@ -212,7 +176,7 @@ class Benchmark:
                 tool=tool_name,
                 score_type=score_type,
                 num_structures=self.num_structures,
-                time_pdb_download=pdb_download_time,
+                time_pdb_download=self.pdb_download_time,
                 time_score_computation=score_computation_time,
                 time_clans_generation=clans_generation_time,
                 time_total=total_time,
@@ -222,15 +186,15 @@ class Benchmark:
             )
             
         except Exception as e:
-            print(f"✗ Failed: {str(e)}")
+            print(f"Failed: {str(e)}")
             return BenchmarkResult(
                 tool=tool_name,
                 score_type=score_type,
                 num_structures=self.num_structures,
-                time_pdb_download=pdb_download_time,
+                time_pdb_download=self.pdb_download_time,
                 time_score_computation=0.0,
                 time_clans_generation=0.0,
-                time_total=pdb_download_time,
+                time_total=self.pdb_download_time,
                 num_scores=0,
                 success=False,
                 error_message=str(e)
@@ -257,7 +221,7 @@ class Benchmark:
                 "Generation Time (s)": f"{result.time_clans_generation:.2f}",
                 "Total Time (s)": f"{result.time_total:.2f}",
                 "Num Scores": result.num_scores,
-                "Success": "✓" if result.success else "✗"
+                "Success": "True" if result.success else "False"
             }
             data.append(row)
         
@@ -334,11 +298,11 @@ class Benchmark:
 
 if __name__ == "__main__":
     # Configuration - edit these values to benchmark different files
-    input_file = "examples/small_fasta_files/50.fasta"
+    input_file = "examples/small_fasta_files/5.fasta"
     input_type = InputFileType.FASTA
     
     # Alternative TSV example:
-    # input_file = "examples/small_tsv_files/100.tsv"
+    # input_file = "examples/small_tsv_files/5.tsv"
     # input_type = InputFileType.TSV
     
     # Run benchmark

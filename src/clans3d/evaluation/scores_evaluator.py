@@ -1,8 +1,8 @@
 import os
 import pandas as pd
+from clans3d.core.pipeline import ClansPipeline, PipelineConfig
 from clans3d.similarity.tool_type import ToolType
 from clans3d.core.input_file_type import InputFileType
-from clans3d.main import create_clans_file
 from clans3d.legacy.utils_old_clans import generate_clans_file_seq_based, run_clans_headless
 from clans3d.core.config_file import ConfigFile
 from clans3d.evaluation.clans_data_extractor import ClansDataExtractor
@@ -36,7 +36,17 @@ class ScoresEvaluator:
 
     def generate_clans_files(self, data: str, input_file_type: InputFileType, tool: ToolType, score: str | None) -> tuple[str, str]:
         if input_file_type == InputFileType.FASTA or input_file_type == InputFileType.TSV or input_file_type == InputFileType.A2M:
-            struct_clans_file_path, cleaned_input_file_as_fasta_path = create_clans_file(data, input_file_type, tool, score, structures_dir="structures", out_dir_path=self.working_dir)
+            config = PipelineConfig(
+                input_file=data,
+                input_type=input_file_type,
+                tool=tool,
+                foldseek_score=score,
+                structures_dir= os.path.join(self.working_dir, "structures"),
+                output_dir= os.path.join(self.working_dir, "clans_files"),
+                input_storage_dir= os.path.join(self.working_dir, "input_file_storage")
+                )
+            pipeline = ClansPipeline(config)
+            struct_clans_file_path, cleaned_input_file_as_fasta_path = pipeline.run()
             seq_clans_file_path = generate_clans_file_seq_based(cleaned_input_file_as_fasta_path, self.working_dir, self.blast_dir)
             return (struct_clans_file_path, seq_clans_file_path)
         else:
