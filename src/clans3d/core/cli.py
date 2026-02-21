@@ -62,14 +62,15 @@ def _build_main_parser() -> argparse.ArgumentParser:
         help="specifies the scoring method to use for Foldseek (default: evalue)",
     )
 
-    parser.add_argument(
+    verbosity = parser.add_mutually_exclusive_group()
+    verbosity.add_argument(
         "-v", "--verbose",
         action="store_true",
         default=False,
         help="enable verbose output with debug-level details",
     )
-    
-    parser.add_argument(
+
+    verbosity.add_argument(
         "-q", "--quiet",
         action="store_true",
         default=False,

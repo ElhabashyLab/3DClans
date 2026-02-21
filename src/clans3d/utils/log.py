@@ -13,14 +13,20 @@ Every module should create its own logger via::
 import logging
 
 
-def setup_logging(verbose: bool = False) -> None:
+def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
     """Configure the *clans3d* logger hierarchy.
 
     Args:
-        verbose: If ``True`` the log level is set to ``DEBUG``,
-                 otherwise ``INFO``.
+        verbose: If ``True`` the log level is set to ``DEBUG``.
+        quiet:   If ``True`` the log level is set to ``ERROR``
+                 (suppresses info/warning messages).  Overrides *verbose*.
     """
-    level = logging.DEBUG if verbose else logging.INFO
+    if quiet:
+        level = logging.ERROR
+    elif verbose:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
     formatter = logging.Formatter(
         fmt="[%(levelname)-7s] %(message)s",
     )

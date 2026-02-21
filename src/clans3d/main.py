@@ -9,7 +9,7 @@ from clans3d.utils.log import setup_logging
 def main():
     args = parse_args()
 
-    setup_logging(verbose=args.verbose)
+    setup_logging(verbose=args.verbose, quiet=args.quiet)
 
     verify_tool_dependencies(ToolType(args.tool))
 
@@ -18,6 +18,8 @@ def main():
         input_type=InputFileType(args.input_type),
         tool=ToolType(args.tool),
         foldseek_score=args.score,
+        verbose=args.verbose,
+        quiet=args.quiet,
     )
     pipeline = ClansPipeline(config)
     clans_file_path, cleaned_input_file_path = pipeline.run()

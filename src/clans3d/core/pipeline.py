@@ -36,6 +36,7 @@ class PipelineConfig:
         tool: Structural similarity tool to use.
         foldseek_score: Score type for Foldseek ("evalue" or "TM"). Ignored for other tools.
         verbose: If ``True``, enable debug-level logging output.
+        quiet: If ``True``, suppress all output except errors.  Overrides *verbose*.
         structures_dir: Directory for downloaded PDB structures.
         output_dir: Directory for generated CLANS files.
         input_storage_dir: Directory for cleaned/intermediate input files.
@@ -48,6 +49,7 @@ class PipelineConfig:
         tool: ToolType,
         foldseek_score: str | None = None,
         verbose: bool = False,
+        quiet: bool = False,
         structures_dir: str = os.path.join("work", "structures"),
         output_dir: str = os.path.join("output", "clans_files"),
         input_storage_dir: str = os.path.join("work", "input_file_storage"),
@@ -57,6 +59,7 @@ class PipelineConfig:
         self.tool = tool
         self.foldseek_score = foldseek_score
         self.verbose = verbose
+        self.quiet = quiet
         self.structures_dir = structures_dir
         self.output_dir = output_dir
         self.input_storage_dir = input_storage_dir
@@ -82,7 +85,7 @@ class ClansPipeline:
     def __init__(self, config: PipelineConfig):
         self.config = config
         # Ensure logging is configured when used as a library (f.e. for benchmark)
-        setup_logging(verbose=config.verbose)
+        setup_logging(verbose=config.verbose, quiet=config.quiet)
         self._validate()
 
     def _validate(self) -> None:
