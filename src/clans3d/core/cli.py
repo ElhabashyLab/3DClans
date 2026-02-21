@@ -68,6 +68,13 @@ def _build_main_parser() -> argparse.ArgumentParser:
         default=False,
         help="enable verbose output with debug-level details",
     )
+    
+    parser.add_argument(
+        "-q", "--quiet",
+        action="store_true",
+        default=False,
+        help="disable all output except for errors",
+    )
 
     return parser
 

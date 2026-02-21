@@ -293,14 +293,11 @@ class Benchmark:
         print(f"Results exported to: {output_path}")
 
 
+# example benchmark run
 if __name__ == "__main__":
     # Configuration - edit these values to benchmark different files
-    input_file = "examples/small_fasta_files/5.fasta"
-    input_type = InputFileType.FASTA
-    
-    # Alternative TSV example:
-    # input_file = "examples/small_tsv_files/5.tsv"
-    # input_type = InputFileType.TSV
+    input_file = "examples/small_tsv_files/99.tsv"
+    input_type = InputFileType.TSV
     
     # Run benchmark
     benchmark = Benchmark(input_file, input_type)
