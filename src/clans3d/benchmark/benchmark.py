@@ -74,7 +74,6 @@ class Benchmark:
         # Download structures and generate cleaned FASTA upfront
         self._init_pipeline = self._make_pipeline(ToolType.FOLDSEEK, None)
         
-        print(f"Downloading PDB structures for {os.path.basename(input_file)}...")
         start = time.perf_counter()
         self.uids_with_regions = self._init_pipeline.fetch_structures()
         self.num_structures = len([f for f in os.listdir(self.structures_dir) 
@@ -153,20 +152,18 @@ class Benchmark:
         
         try:
             # Score Computation
-            print(f"  - Computing similarity scores...", end=" ", flush=True)
             start = time.perf_counter()
             scores = pipeline.compute_scores()
             score_computation_time = time.perf_counter() - start
-            print(f"done ({score_computation_time:.2f}s)")
+            print(f"Computed scores for {len(scores)} pairs in {score_computation_time:.2f}s")
             
             # CLANS Generation
-            print(f"  - Generating CLANS file...", end=" ", flush=True)
             start = time.perf_counter()
             output_name = f"{tool_name}_{score_type if score_type else 'default'}.clans"
             pipeline.generate_clans_file(scores, self.cleaned_fasta_path,
                                          output_filename=output_name)
             clans_generation_time = time.perf_counter() - start
-            print(f"done ({clans_generation_time:.2f}s)")
+            print(f"Generated CLANS file {output_name} in {clans_generation_time:.2f}s")
             
             total_time = self.pdb_download_time + score_computation_time + clans_generation_time
             

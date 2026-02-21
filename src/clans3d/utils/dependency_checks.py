@@ -29,6 +29,8 @@ def verify_tool_dependencies(tool_type: ToolType) -> None:
     Raises:
         RuntimeError: If the tool is not found in PATH.
     """
+    logger.debug("Checking dependencies for tool: %s", tool_type.value)
+    
     tool_map = {
         ToolType.FOLDSEEK: "foldseek",
         ToolType.TMALIGN: "TMalign",

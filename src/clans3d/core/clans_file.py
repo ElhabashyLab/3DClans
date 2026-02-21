@@ -37,7 +37,6 @@ class ClansFile:
     0 2:4.8e-50
     1 2:2.8e-48
     </hsp>
-
     """
     def __init__(self,
                  number_of_sequences: int,

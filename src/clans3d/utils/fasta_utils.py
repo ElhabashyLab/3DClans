@@ -174,6 +174,7 @@ def download_fasta_record(uid: str, upi=None, region: tuple[int, int] | None = N
         SeqRecord: downloaded FASTA record.
         bool: False if download failed.
     """
+    logger.debug("Attempting to download FASTA record for UID: %s with UPI: %s and region: %s", uid, upi, region)
     uniprot_api_url = f"https://rest.uniprot.org/uniprotkb/{uid}.fasta"
     uniparc_api_url = f"https://rest.uniprot.org/uniparc/{upi}.fasta"
     urls = [uniprot_api_url, uniparc_api_url if upi is not None else uniprot_api_url]
@@ -252,6 +253,7 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict[str, tuple[int
         original_fasta (str, optional): Path to an existing FASTA file with sequences.
     Returns:
     """
+    logger.debug("Generating FASTA from UIDs with regions...")
     uids = list(uids_with_regions.keys())
     # generate fasta with records of original_fasta file
     if original_fasta is not None:

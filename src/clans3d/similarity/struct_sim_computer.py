@@ -27,7 +27,6 @@ class StructSimComputer:
         Run the specified tool on the PDB directory.
         """
         tool = self._create_tool(tool_type)
-        logger.info("Computing structural similarity with %s...", tool.name)
         num_structures = len(os.listdir(pdb_dir))
         expected_number_of_scores = (num_structures * (num_structures + 1) // 2) - num_structures
         scores = tool.start_run(pdb_dir)

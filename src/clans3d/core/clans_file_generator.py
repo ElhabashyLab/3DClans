@@ -184,7 +184,6 @@ class ClansFileGenerator:
         Returns:
             The path to the generated CLANS file.
         """
-        logger.info("Generating CLANS file %s...", out_path)
         uids = extract_uids_from_fasta(path_to_fasta)
         scores = self._normalize_scores_format(scores, uids)
         self.length_of_fasta = len(uids)
@@ -199,7 +198,6 @@ class ClansFileGenerator:
         content = str(clans_file)
         with open(out_path, 'w') as file:
             file.write(content)
-        logger.info("CLANS file generated at %s", out_path)
         return out_path
 
 

@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 def _log_interval(total: int) -> int:
-    """Return how often to log progress: every 10 items or every 20%, whichever is smaller."""
-    return max(1, min(10, total // 5))
+    """Return how often to log progress: every 10 items or every 10%, whichever is smaller."""
+    return max(1, min(10, total // 10))
 
 
 def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict[str, tuple[int, int] | None]:
@@ -34,7 +34,6 @@ def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir:
         dict (str, tuple[int, int] | None): Containing downloaded uids together with their regions.
     """    
     reset_dir_content(output_dir)
-    logger.info("Downloading structure files...")
     if input_file_type is InputFileType.FASTA or input_file_type is InputFileType.A2M:
         return process_fasta_file(input_file_path, output_dir)
     elif input_file_type is InputFileType.TSV:
@@ -70,10 +69,7 @@ def process_fasta_file(input_file_path: str, output_dir: str) -> dict:
         if idx % interval == 0 or idx == total_records:
             logger.info("Downloaded %d/%d structures...", idx, total_records)
     failed = total_records - successful_downloads
-    if failed:
-        logger.info("Downloaded %d/%d PDB files (%d failed).", successful_downloads, total_records, failed)
-    else:
-        logger.info("Downloaded %d/%d PDB files.", successful_downloads, total_records)
+    logger.info("Downloaded %d/%d PDB files (%d failed).", successful_downloads, total_records, failed)
     return uids_with_regions
 
 
@@ -109,10 +105,7 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
         if idx % interval == 0 or idx == total_uids:
             logger.info("Downloaded %d/%d structures...", idx, total_uids)
     failed = total_uids - successful_downloads
-    if failed:
-        logger.info("Downloaded %d/%d PDB files (%d failed).", successful_downloads, total_uids, failed)
-    else:
-        logger.info("Downloaded %d/%d PDB files.", successful_downloads, total_uids)
+    logger.info("Downloaded %d/%d PDB files (%d failed).", successful_downloads, total_uids, failed)
     return uids_with_regions
 
 
@@ -138,6 +131,7 @@ def download_alphafold_structure(
         bool: True if the structure was successfully downloaded (and processed),
               False otherwise.
     """
+    logger.debug("Downloading structure for ID: %s with region: %s", id, region)
     if file_format not in {"pdb", "cif"}:
         raise ValueError("file_format must be 'pdb' or 'cif'")
     
@@ -189,6 +183,7 @@ def extract_region_of_protein(path_to_protein: str, file_type: str, region: tupl
         region (tuple[int, int]): (start, end) residue indices to extract.
         output_path (str, optional): Path to save extracted structure. Defaults to adding '_region' suffix.
     """
+    logger.debug("Extracting region %s from protein file: %s", region, path_to_protein)
     class SelectRegion(Select):
         def accept_residue(self, residue):
             return region[0] <= residue.id[1] <= region[1]

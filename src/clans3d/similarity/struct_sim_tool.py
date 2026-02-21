@@ -29,6 +29,7 @@ class StructSimTool():
         """
         Executes self.command in a subprocess and captures the output.
         """
+        logger.debug("Running command: %s", " ".join(self.command))
         try:
             result = subprocess.run(self.command,
                                     capture_output=True,

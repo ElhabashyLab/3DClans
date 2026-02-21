@@ -2,8 +2,7 @@
 CLI argument parsing for Clans-3D.
 
 Provides the argparse setup for the main entry point and the config-file
-pre-parser. Separated from main.py so the module stays focused on
-orchestration only.
+pre-parser.
 """
 
 import sys
@@ -72,6 +71,15 @@ def _build_main_parser() -> argparse.ArgumentParser:
 
     return parser
 
+def _build_conf_parser() -> argparse.ArgumentParser:
+    """Build a pre-parser to detect the config file argument."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument(
+        "-c", "--conf",
+        type=str,
+        help="specifies the path to the configuration file with the format -<key> <value>",
+    )
+    return parser
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse CLI arguments, merging an optional config file.
@@ -90,8 +98,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         argv = sys.argv[1:]
 
     # Pre-parse to detect a config file
-    conf_parser = argparse.ArgumentParser(add_help=False)
-    conf_parser.add_argument("-c", "--conf", type=str)
+    conf_parser = _build_conf_parser()
     conf_args, _ = conf_parser.parse_known_args(argv)
     path_to_config = conf_args.conf
 

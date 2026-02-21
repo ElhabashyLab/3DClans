@@ -109,6 +109,7 @@ class ClansPipeline:
         Returns:
             dict mapping UID to optional (region_start, region_end).
         """
+        logger.info("Fetching structures from AlphaFold...")
         os.makedirs(self.config.structures_dir, exist_ok=True)
         return fetch_pdbs(
             self.config.input_file,
@@ -148,6 +149,7 @@ class ClansPipeline:
         Returns:
             DataFrame with columns [PDBchain1, PDBchain2, score].
         """
+        logger.info("Computing pairwise similarity scores with %s...", self.config.tool.value)
         foldseek_score = self.config.foldseek_score or "evalue"
         computer = StructSimComputer(foldseek_score=foldseek_score)
         scores = computer.run(self.config.tool, self.config.structures_dir)
@@ -168,6 +170,7 @@ class ClansPipeline:
         Returns:
             Path to the generated CLANS file.
         """
+        logger.info("Generating CLANS file...")
         os.makedirs(self.config.output_dir, exist_ok=True)
         if output_filename is None:
             output_filename = (
@@ -175,7 +178,9 @@ class ClansPipeline:
             )
         out_path = os.path.join(self.config.output_dir, output_filename)
         generator = ClansFileGenerator()
-        return generator.generate_clans_file(scores, cleaned_fasta_path, out_path)
+        path_to_clans_file = generator.generate_clans_file(scores, cleaned_fasta_path, out_path)
+        logger.info("CLANS file generated at %s", path_to_clans_file)
+        return path_to_clans_file
 
     # ------------------------------------------------------------------
     # Full pipeline execution
