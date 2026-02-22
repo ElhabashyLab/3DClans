@@ -2,7 +2,7 @@
 ClansPipeline: Reusable pipeline for CLANS file generation.
 
 Encapsulates the complete workflow:
-1. Fetch PDB structures
+1. Fetch protein structures
 2. Generate cleaned FASTA
 3. Compute pairwise similarity scores
 4. Generate CLANS visualization file
@@ -20,7 +20,7 @@ from clans3d.core.input_file_type import InputFileType
 from clans3d.core.clans_file_generator import ClansFileGenerator
 from clans3d.similarity.struct_sim_computer import StructSimComputer
 from clans3d.similarity.tool_type import ToolType
-from clans3d.utils.structure_utils import fetch_pdbs
+from clans3d.utils.structure_utils import fetch_structures
 from clans3d.utils.fasta_utils import generate_fasta_from_uids_with_regions
 from clans3d.utils.log import setup_logging
 
@@ -37,7 +37,7 @@ class PipelineConfig:
         foldseek_score: Score type for Foldseek ("evalue" or "TM"). Ignored for other tools.
         verbose: If ``True``, enable debug-level logging output.
         quiet: If ``True``, suppress all output except errors.  Overrides *verbose*.
-        structures_dir: Directory for downloaded PDB structures.
+        structures_dir: Directory for downloaded structures.
         output_dir: Directory for generated CLANS files.
         input_storage_dir: Directory for cleaned/intermediate input files.
     """
@@ -107,14 +107,14 @@ class ClansPipeline:
     # ------------------------------------------------------------------
 
     def fetch_structures(self) -> dict[str, tuple[int, int] | None]:
-        """Step 1: Download PDB structures.
+        """Step 1: Download protein structures.
 
         Returns:
             dict mapping UID to optional (region_start, region_end).
         """
         logger.info("Fetching structures from AlphaFold...")
         os.makedirs(self.config.structures_dir, exist_ok=True)
-        return fetch_pdbs(
+        return fetch_structures(
             self.config.input_file,
             self.config.input_type,
             self.config.structures_dir,
@@ -150,7 +150,7 @@ class ClansPipeline:
         """Step 3: Compute pairwise structural similarity scores.
 
         Returns:
-            DataFrame with columns [PDBchain1, PDBchain2, score].
+            DataFrame with columns [Sequence_ID_1, Sequence_ID_2, score].
         """
         logger.info("Computing pairwise similarity scores with %s...", self.config.tool.value)
         foldseek_score = self.config.foldseek_score or "evalue"

@@ -19,16 +19,16 @@ def _log_interval(total: int) -> int:
     return max(1, min(10, total // 10))
 
 
-def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict[str, tuple[int, int] | None]:
+def fetch_structures(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict[str, tuple[int, int] | None]:
     """
-    Fetches and stores PDB files, specified in a given input_file in a output directory.
+    Fetches and stores structure files, specified in a given input_file in a output directory.
     The contents of the output dir will be overwritten.
     It returns a dict containing {uid : (region_start, region_end)} of the sequences that have been successfully downloaded.
     
     Args:
         input_file_path: Path to the input file.
         input_file_type: Specifies the type of the input file.
-        output_dir: The directory where the downloaded PDBs are stored.
+        output_dir: The directory where the downloaded structures are stored.
         
     Returns:
         dict (str, tuple[int, int] | None): Containing downloaded uids together with their regions.
@@ -44,13 +44,13 @@ def fetch_pdbs(input_file_path: str, input_file_type: InputFileType, output_dir:
 
 def process_fasta_file(input_file_path: str, output_dir: str) -> dict:
     """
-    Downloads the PDBs of the sequences in the given fasta_file.
+    Downloads the structures of the sequences in the given fasta_file.
     It also creates a dictionary with an entry for each downloaded record: {uid : region}
     The region can be None if not specified in the header of the fasta records.
 
     Args:
         input_file_path (str): Path to fasta file.
-        output_dir (str): Directory in which to save the downloaded PDBs.
+        output_dir (str): Directory in which to save the downloaded structures.
 
     Returns:
         dict: Containing downloaded uids together with their regions.
@@ -69,7 +69,7 @@ def process_fasta_file(input_file_path: str, output_dir: str) -> dict:
         if idx % interval == 0 or idx == total_records:
             logger.info("Downloaded %d/%d structures...", idx, total_records)
     failed = total_records - successful_downloads
-    logger.info("Downloaded %d/%d PDB files (%d failed).", successful_downloads, total_records, failed)
+    logger.info("Downloaded %d/%d structure files (%d failed).", successful_downloads, total_records, failed)
     return uids_with_regions
 
 
@@ -81,7 +81,7 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
 
     Args:
         input_file_path (str): Path to tsv file.
-        output_dir (str): Directory in which to save the downloaded PDBs.
+        output_dir (str): Directory in which to save the downloaded structures.
 
     Returns:
         dict: Containing downloaded records together with their regions.
@@ -105,7 +105,7 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
         if idx % interval == 0 or idx == total_uids:
             logger.info("Downloaded %d/%d structures...", idx, total_uids)
     failed = total_uids - successful_downloads
-    logger.info("Downloaded %d/%d PDB files (%d failed).", successful_downloads, total_uids, failed)
+    logger.info("Downloaded %d/%d structure files (%d failed).", successful_downloads, total_uids, failed)
     return uids_with_regions
 
 
@@ -178,7 +178,7 @@ def extract_region_of_protein(path_to_protein: str, file_type: str, region: tupl
     without corrupting metadata. Writes output to a new file by default.
     
     Args:
-        path_to_protein (str): Path to the protein file.
+        path_to_protein (str): Path to the protein structure file.
         file_type (str): 'pdb' or 'cif'.
         region (tuple[int, int]): (start, end) residue indices to extract.
         output_path (str, optional): Path to save extracted structure. Defaults to adding '_region' suffix.
@@ -246,16 +246,16 @@ def handle_DBREF_line(line: str, region: tuple[int, int]) -> str:
     region_end = region[1]
     parts = line.split()
     parts = line.split()
-    pdb_start = int(parts[3])
-    pdb_end = int(parts[4])
+    struct_start = int(parts[3])
+    struct_end = int(parts[4])
     uniprot_start = int(parts[8])
     uniprot_end = int(parts[9])
-    offset_start = pdb_start - uniprot_start
-    offset_end = pdb_end - uniprot_end
+    offset_start = struct_start - uniprot_start
+    offset_end = struct_end - uniprot_end
     uniprot_start_corrected = region_start - offset_start
     uniprot_end_corrected = region_end - offset_end
-    parts[3] = str(region_start) # new pdb start reflects region start
-    parts[4] = str(region_end) # new pdb end reflects region end
+    parts[3] = str(region_start) # new structure start reflects region start
+    parts[4] = str(region_end) # new structure end reflects region end
     parts[8] = str(uniprot_start_corrected) # new uniprot start reflects region start (corrected by possible offset)
     parts[9] = str(uniprot_end_corrected) # new uniprot end reflects region end (corrected by possible offset)
     adapted_line = " ".join(parts) + "\n"
@@ -264,10 +264,10 @@ def handle_DBREF_line(line: str, region: tuple[int, int]) -> str:
 
 def get_meta_data_of_structure_file(path_to_protein: str) -> list[str]:
     """
-    Extracts the meta data from a PDB or CIF structure file. This includes header lines before the ATOM/HETATM lines.
+    Extracts the meta data from a structure file (PDB or CIF). This includes header lines before the ATOM/HETATM lines.
     
     Args:
-        path_to_protein (str): Path to the protein file.
+        path_to_protein (str): Path to the protein structure file.
         file_type (str): 'pdb' or 'cif'.
     Returns:
         list[str]: List of meta data lines.

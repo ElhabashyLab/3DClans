@@ -17,7 +17,7 @@ class StructSimTool():
         self.output = None
         
         
-    def start_run(self, pdb_dir):
+    def start_run(self, structures_dir):
         """
         Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run.
         This method should be overridden by subclasses to implement specific tool logic.

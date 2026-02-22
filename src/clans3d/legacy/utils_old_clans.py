@@ -43,11 +43,11 @@ def generate_clans_file_seq_based(fasta_file_path: str, out_dir_path: str, blast
     input_file_name = os.path.splitext(os.path.basename(fasta_file_path))[0]
     blast_results_path = os.path.join(blast_dir_path, f"{input_file_name}_blast.tsv")
     [blast_results_path, outformat] = blast_fasta(fasta_file_path, blast_results_path, blast_dir_path)
-    blast_results_df = pd.read_csv(blast_results_path, sep="\t", names=["PDBchain1", "PDBchain2", "score"])
-    blast_results_df["PDBchain1"] = blast_results_df["PDBchain1"].apply(extract_uid_from_recordID)
-    blast_results_df["PDBchain2"] = blast_results_df["PDBchain2"].apply(extract_uid_from_recordID)
-    blast_results_df = blast_results_df[blast_results_df['PDBchain1'] != blast_results_df['PDBchain2']] # remove self-hits
-    scores_df = blast_results_df.drop_duplicates(subset=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
+    blast_results_df = pd.read_csv(blast_results_path, sep="\t", names=["Sequence_ID_1", "Sequence_ID_2", "score"])
+    blast_results_df["Sequence_ID_1"] = blast_results_df["Sequence_ID_1"].apply(extract_uid_from_recordID)
+    blast_results_df["Sequence_ID_2"] = blast_results_df["Sequence_ID_2"].apply(extract_uid_from_recordID)
+    blast_results_df = blast_results_df[blast_results_df['Sequence_ID_1'] != blast_results_df['Sequence_ID_2']] # remove self-hits
+    scores_df = blast_results_df.drop_duplicates(subset=["Sequence_ID_1", "Sequence_ID_2"]).reset_index(drop=True)
     clans_file_generator = ClansFileGenerator()
     out_path = os.path.join(out_dir_path, f"{input_file_name}_seq.clans")
     clans_file_path = clans_file_generator.generate_clans_file(scores_df, fasta_file_path, out_path)

@@ -4,11 +4,11 @@
 
 The Clans-3D benchmark provides comprehensive performance analysis of structural similarity tools across the full pipeline:
 
-1. **PDB Download**: Time to fetch/retrieve protein structures
+1. **Structure Download**: Time to fetch/retrieve protein structures
 2. **Score Computation**: Time for pairwise similarity calculation
 3. **CLANS Generation**: Time to create visualization file
 
-PDB structures are downloaded automatically when the `Benchmark` is created, so individual tool runs require no manual preparation.
+Structures are downloaded automatically when the `Benchmark` is created, so individual tool runs require no manual preparation.
 
 ## Supported Tools
 
@@ -58,7 +58,7 @@ Supported are FASTA, A2M, and TSV formats. See Input File Formats section in the
 
 The benchmark displays:
 
-- Progress for each stage (PDB download, computation, generation)
+- Progress for each stage (structure download, computation, generation)
 - Formatted results table with timing breakdown
 - Summary statistics (fastest/slowest tool, timing breakdown)
 
@@ -110,7 +110,7 @@ CSV columns:
 ```
 benchmark_output/
 └── run_20260213_150904/
-    ├── structures/                          # Downloaded PDB files
+    ├── structures/                          # Downloaded structure files
     ├── clans_files/                        # Generated CLANS files
     │   ├── foldseek_evalue.clans
     │   ├── foldseek_TM.clans
@@ -157,7 +157,7 @@ from clans3d.benchmark import Benchmark
 from clans3d.core.input_file_type import InputFileType
 from clans3d.similarity.tool_type import ToolType
 
-# Initialize benchmark (downloads PDBs automatically)
+# Initialize benchmark (downloads structures automatically)
 benchmark = Benchmark("input.fasta", InputFileType.FASTA)
 
 # Run single tool -- no manual download needed

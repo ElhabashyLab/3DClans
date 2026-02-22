@@ -29,7 +29,7 @@ src/clans3d/
 │   ├── file_utils.py                # File/directory operations
 │   ├── api_utils.py                 # UniProt/UniParc API calls
 │   ├── fasta_utils.py               # FASTA parsing and generation
-│   ├── structure_utils.py           # PDB structure retrieval
+│   ├── structure_utils.py           # Structure file retrieval
 │   └── dependency_checks.py         # External tool verification
 ├── evaluation/                      # Analysis and clustering
 │   ├── scores_evaluator.py          # Main evaluation orchestrator
@@ -97,7 +97,7 @@ All imports use the `clans3d` package path:
 from clans3d.core.input_file_type import InputFileType
 from clans3d.similarity.tool_type import ToolType
 from clans3d.similarity.struct_sim_computer import StructSimComputer
-from clans3d.utils.structure_utils import fetch_pdbs
+from clans3d.utils.structure_utils import fetch_structures
 from clans3d.evaluation.scores_evaluator import ScoresEvaluator
 ```
 
@@ -109,7 +109,7 @@ from clans3d.evaluation.scores_evaluator import ScoresEvaluator
 2. Call `create_clans_file()` which:
    - Validates and normalizes input file
    - Extracts protein UIDs/regions
-   - Downloads/retrieves PDB structures
+   - Downloads/retrieves protein structures
    - Runs similarity tool via StructSimComputer
    - Generates ClansFile with coordinates (from CLANS visualization)
 3. Output: CLANS file + cleaned FASTA file
@@ -178,7 +178,7 @@ clans3d -l input.fasta -i fasta -t foldseek [-s evalue|TM] [-c config.conf]
   - foldseek (fast similarity computation)
   - USalign (slower, structure alignment)
 - **CLANS software**: For visualization (headless execution via `clans3d.legacy.utils_old_clans`)
-- **PDB database access**: For structure retrieval (AlphaFold DB, online PDB queries)
+- **Structure database access**: For structure retrieval (AlphaFold DB, online queries)
 
 ## Testing Considerations
 

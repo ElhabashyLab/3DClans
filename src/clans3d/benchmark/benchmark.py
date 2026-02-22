@@ -2,7 +2,7 @@
 Benchmark module for Clans-3D structural similarity tools.
 
 This module provides comprehensive benchmarking of the full Clans-3D pipeline,
-measuring timing for PDB download, score computation, and CLANS file generation.
+measuring timing for structure download, score computation, and CLANS file generation.
 
 Supported tools:
 - Foldseek (with evalue and TM score types)
@@ -39,7 +39,7 @@ class Benchmark:
         """
         Initialize benchmark with input file.
         
-        Downloads PDB structures and generates the cleaned FASTA immediately
+        Downloads structures and generates the cleaned FASTA immediately
         so that individual tool benchmarks can run without extra setup.
         
         Args:
@@ -81,8 +81,8 @@ class Benchmark:
         self.cleaned_fasta_path = self._init_pipeline.generate_cleaned_fasta(
             self.uids_with_regions
         )
-        self.pdb_download_time = time.perf_counter() - start
-        print(f"Downloaded {self.num_structures} structures in {self.pdb_download_time:.2f}s")
+        self.structure_download_time = time.perf_counter() - start
+        print(f"Downloaded {self.num_structures} structures in {self.structure_download_time:.2f}s")
     
     def _make_pipeline(self, tool: ToolType, score_type: str | None) -> ClansPipeline:
         """Create a ClansPipeline for the given tool configuration."""
@@ -165,7 +165,7 @@ class Benchmark:
             clans_generation_time = time.perf_counter() - start
             print(f"Generated CLANS file {output_name} in {clans_generation_time:.2f}s")
             
-            total_time = self.pdb_download_time + score_computation_time + clans_generation_time
+            total_time = self.structure_download_time + score_computation_time + clans_generation_time
             
             print(f"  - Total: {total_time:.2f}s | Scores: {len(scores)}")
             
@@ -173,7 +173,7 @@ class Benchmark:
                 tool=tool_name,
                 score_type=score_type,
                 num_structures=self.num_structures,
-                time_pdb_download=self.pdb_download_time,
+                time_structure_download=self.structure_download_time,
                 time_score_computation=score_computation_time,
                 time_clans_generation=clans_generation_time,
                 time_total=total_time,
@@ -188,10 +188,10 @@ class Benchmark:
                 tool=tool_name,
                 score_type=score_type,
                 num_structures=self.num_structures,
-                time_pdb_download=self.pdb_download_time,
+                time_structure_download=self.structure_download_time,
                 time_score_computation=0.0,
                 time_clans_generation=0.0,
-                time_total=self.pdb_download_time,
+                time_total=self.structure_download_time,
                 num_scores=0,
                 success=False,
                 error_message=str(e)
@@ -213,7 +213,7 @@ class Benchmark:
                 "Tool": result.tool,
                 "Score Type": result.score_type if result.score_type else "-",
                 "Num Structures": result.num_structures,
-                "Download Time (s)": f"{result.time_pdb_download:.2f}",
+                "Download Time (s)": f"{result.time_structure_download:.2f}",
                 "Computation Time (s)": f"{result.time_score_computation:.2f}",
                 "Generation Time (s)": f"{result.time_clans_generation:.2f}",
                 "Total Time (s)": f"{result.time_total:.2f}",
@@ -264,7 +264,7 @@ class Benchmark:
                   (f" ({slowest.score_type})" if slowest.score_type else "") + 
                   f" - {slowest.time_total:.2f}s total")
             
-            avg_download = sum(r.time_pdb_download for r in successful_results) / len(successful_results)
+            avg_download = sum(r.time_structure_download for r in successful_results) / len(successful_results)
             avg_total = sum(r.time_total for r in successful_results) / len(successful_results)
             download_percentage = (avg_download / avg_total) * 100 if avg_total > 0 else 0
             print(f"  Download time contributes ~{download_percentage:.1f}% to total time")

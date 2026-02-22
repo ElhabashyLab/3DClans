@@ -51,8 +51,8 @@ class ClansFileGenerator:
         
         # Map indices back to UIDs in scores DataFrame
         scores_df = scores_df_raw.copy()
-        scores_df["PDBchain1"] = scores_df["PDBchain1"].map(idx_to_uid)
-        scores_df["PDBchain2"] = scores_df["PDBchain2"].map(idx_to_uid)
+        scores_df["Sequence_ID_1"] = scores_df["Sequence_ID_1"].map(idx_to_uid)
+        scores_df["Sequence_ID_2"] = scores_df["Sequence_ID_2"].map(idx_to_uid)
         
         return ClansFile(number_of_sequences, coordinates, scores_df, path_to_fasta=None, fasta_records=fasta_records, parameters=params)
 
@@ -166,9 +166,9 @@ class ClansFileGenerator:
             if not line:
                 continue
             left, right = line.split(":")
-            pdb1, pdb2 = left.split()
+            id1, id2 = left.split()
             score = right
-            scores_data.append({"PDBchain1": int(pdb1), "PDBchain2": int(pdb2), "score": float(score)})
+            scores_data.append({"Sequence_ID_1": int(id1), "Sequence_ID_2": int(id2), "score": float(score)})
         scores_df = pd.DataFrame(scores_data)
         return scores_df
     
@@ -210,17 +210,17 @@ class ClansFileGenerator:
         
         Args:
             scores: A pandas DataFrame containing the pairwise similarity scores with columns
-                    [PDBchain1, PDBchain2, score] where PDBchain1/2 are UIDs.
+                    [Sequence_ID_1, Sequence_ID_2, score] where Sequence_ID_1/2 are UIDs.
             uids: A list of UIDs in the order they appear in the input fasta file.
         Returns:
             A pandas DataFrame containing the normalized pairwise similarity scores with UIDs.
         """
         scores1 = scores.copy()
         # Ensure consistent ordering for deduplication (smaller UID first alphabetically)
-        mask = scores1["PDBchain1"] > scores1["PDBchain2"]
-        scores1.loc[mask, ["PDBchain1", "PDBchain2"]] = scores1.loc[mask, ["PDBchain2", "PDBchain1"]].values
+        mask = scores1["Sequence_ID_1"] > scores1["Sequence_ID_2"]
+        scores1.loc[mask, ["Sequence_ID_1", "Sequence_ID_2"]] = scores1.loc[mask, ["Sequence_ID_2", "Sequence_ID_1"]].values
         # Drop duplicates
-        scores1 = scores1.drop_duplicates(subset=["PDBchain1", "PDBchain2"]).reset_index(drop=True)
+        scores1 = scores1.drop_duplicates(subset=["Sequence_ID_1", "Sequence_ID_2"]).reset_index(drop=True)
         return scores1
 
 

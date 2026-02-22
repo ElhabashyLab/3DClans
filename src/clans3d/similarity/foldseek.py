@@ -42,7 +42,7 @@ class Foldseek(StructSimTool):
         return output_columns
 
 
-    def start_run(self, pdb_dir):
+    def start_run(self, structures_dir):
         """
         Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run.
         This method should be overridden by subclasses to implement specific tool logic.
@@ -60,7 +60,7 @@ class Foldseek(StructSimTool):
         # clean working directory before running
         reset_dir_content(self.working_dir)
         # creating target_db = query_db
-        self.db = self._create_database(pdb_dir, "foldseekDB")
+        self.db = self._create_database(structures_dir, "foldseekDB")
         if not self.db:
             raise Exception("Failed to create Foldseek database.")
         # running alignment
@@ -70,11 +70,11 @@ class Foldseek(StructSimTool):
         return self._execute_run()
 
 
-    def _create_database(self, pdb_dir, db_name):
+    def _create_database(self, structures_dir, db_name):
         """
-        Creates a foldseek database named db_name with pdb_dir.
+        Creates a foldseek database named db_name from the given structures directory.
         """
-        create_db_command = [self.name, self.createdb, pdb_dir, os.path.join(self.working_dir, db_name)]
+        create_db_command = [self.name, self.createdb, structures_dir, os.path.join(self.working_dir, db_name)]
         try:
             result = subprocess.run(create_db_command,
                                     capture_output=True,
@@ -101,7 +101,7 @@ class Foldseek(StructSimTool):
                                     check=True)
             df = pd.read_csv(self.alignmentFile, sep="\t")
             # name the columns of the df
-            df.columns = ["PDBchain1", "PDBchain2", "TM1", "TM2"] if self.score == "TM" else ["PDBchain1", "PDBchain2", "evalue"]
+            df.columns = ["Sequence_ID_1", "Sequence_ID_2", "TM1", "TM2"] if self.score == "TM" else ["Sequence_ID_1", "Sequence_ID_2", "evalue"]
             df1 = self._clean_scores(df)
             return df1
         except subprocess.CalledProcessError as e:
@@ -113,15 +113,15 @@ class Foldseek(StructSimTool):
 
     def _clean_scores(self, df):
         """
-        Receives a DataFrame containing the columns 'PDBchain1, PDBchain2, score'
-        and returns a cleaned DataFrame with no duplicate rows like PDBchain1:PDBchain2 and PDBchain2:PDBchain1
+        Receives a DataFrame containing the columns 'Sequence_ID_1, Sequence_ID_2, score'
+        and returns a cleaned DataFrame with no duplicate rows like Sequence_ID_1:Sequence_ID_2 and Sequence_ID_2:Sequence_ID_1
         """
         # remove duplicates like A:B and B:A
-        df["pairs"] = df.apply(lambda row: tuple(sorted([row['PDBchain1'], row['PDBchain2']])), axis=1)
+        df["pairs"] = df.apply(lambda row: tuple(sorted([row['Sequence_ID_1'], row['Sequence_ID_2']])), axis=1)
         df1 = df.drop_duplicates(subset="pairs")
         df2 = df1.drop(columns=["pairs"])
         # remove rows where A is the same as B
-        df3 = df2[df2['PDBchain1'] != df2['PDBchain2']].copy()
+        df3 = df2[df2['Sequence_ID_1'] != df2['Sequence_ID_2']].copy()
         # clean scores based on self.score
         if self.score == "TM":
             df3['maxTM'] = df3[['TM1', 'TM2']].max(axis=1)

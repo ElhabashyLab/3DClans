@@ -18,25 +18,25 @@ class USalign(StructSimTool):
         description = "A tool for protein structure comparison using USalign."
         working_dir = os.path.join("work", "usalign")
         super().__init__("USalign", description, working_dir)
-        self.flag_dir = "-dir" # specifies the directory containing PDB files
+        self.flag_dir = "-dir" # specifies the directory containing structure files
         self.flag_outfmt = "-outfmt" # specifies the output format
         self.outfmt = "2"
         
         
-    def start_run(self, pdb_dir):
+    def start_run(self, structures_dir):
         """
-        Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run with the specified pdb_dir.
+        Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run with the specified structures_dir.
         """
         # clean working directory before running
         reset_dir_content(self.working_dir)        
         # prepare files for USalign
-        pdb_files = os.listdir(pdb_dir)
-        pdb_names_list = os.path.join(self.working_dir, "pdb_names.txt")
-        with open(pdb_names_list, 'w') as f:
-            for pdb_name in pdb_files:
-                f.write(f"{pdb_name}\n")
-        # example command: "USalign -dir PDBs_for_benchmark/ pdb_names.txt -outfmt 2"
-        self.command = [self.name, self.flag_dir, pdb_dir + "/", pdb_names_list, self.flag_outfmt, self.outfmt]
+        structure_files = os.listdir(structures_dir)
+        structure_names_list = os.path.join(self.working_dir, "structure_names.txt")
+        with open(structure_names_list, 'w') as f:
+            for structure_name in structure_files:
+                f.write(f"{structure_name}\n")
+        # example command: "USalign -dir structures_dir/ structure_names.txt -outfmt 2"
+        self.command = [self.name, self.flag_dir, structures_dir + "/", structure_names_list, self.flag_outfmt, self.outfmt]
         return self._execute_run()
 
     
@@ -53,9 +53,11 @@ class USalign(StructSimTool):
                 df1['TM'] = df1[['TM1', 'TM2']].max(axis=1)
                 df1["score"] = 1 - df1["TM"]  # transform TM-score to distance metric
                 df2 = df1.drop(columns=['TM1', 'TM2'])
-                # clean PDBchain names
+                # clean structure names (remove file extensions)
                 df2['PDBchain1'] = df2['PDBchain1'].str.split(".").str[0]
                 df2['PDBchain2'] = df2['PDBchain2'].str.split(".").str[0]
+                # rename columns to standard naming
+                df2 = df2.rename(columns={'PDBchain1': 'Sequence_ID_1', 'PDBchain2': 'Sequence_ID_2'})
                 return df2
             else:
                 logger.error("Failed to parse output: DataFrame is empty.")

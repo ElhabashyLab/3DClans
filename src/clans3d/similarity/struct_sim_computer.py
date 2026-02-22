@@ -21,14 +21,14 @@ class StructSimComputer:
         self.results = {}    
 
 
-    def run(self, tool_type: ToolType, pdb_dir: str):
+    def run(self, tool_type: ToolType, structures_dir: str):
         """
-        Run the specified tool on the PDB directory.
+        Run the specified tool on the structures directory.
         """
         tool = self._create_tool(tool_type)
-        num_structures = len(os.listdir(pdb_dir))
+        num_structures = len(os.listdir(structures_dir))
         expected_number_of_scores = (num_structures * (num_structures + 1) // 2) - num_structures
-        scores = tool.start_run(pdb_dir)
+        scores = tool.start_run(structures_dir)
         if scores is None or len(scores) != expected_number_of_scores:
             if scores is None:
                 len_scores = 0

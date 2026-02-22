@@ -104,7 +104,7 @@ class ClansFile:
         
         # Validate scores UIDs
         if not self.scores.empty:
-            score_uids = set(self.scores['PDBchain1'].unique()) | set(self.scores['PDBchain2'].unique())
+            score_uids = set(self.scores['Sequence_ID_1'].unique()) | set(self.scores['Sequence_ID_2'].unique())
             missing_score_uids = score_uids - set(self._uid_to_index.keys())
             if missing_score_uids:
                 raise ValueError(
@@ -146,8 +146,8 @@ class ClansFile:
         content.append("<hsp>")
         for index, row in self.scores.iterrows():
             # Convert UIDs back to indices for CLANS file format
-            uid1 = row['PDBchain1']
-            uid2 = row['PDBchain2']
+            uid1 = row['Sequence_ID_1']
+            uid2 = row['Sequence_ID_2']
             idx1 = self._uid_to_index.get(uid1, uid1)  # Fallback for backwards compat
             idx2 = self._uid_to_index.get(uid2, uid2)
             content.append(f"{idx1} {idx2}:{row['score']}")
