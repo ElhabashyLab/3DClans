@@ -20,10 +20,9 @@ src/clans3d/
 │   ├── clans_file.py                # ClansFile data class
 │   └── clans_file_generator.py      # Parse/generate CLANS files
 ├── similarity/                      # Structural similarity computation
-│   ├── tool_type.py                 # ToolType enum (Foldseek, TMalign, USalign)
+│   ├── tool_type.py                 # ToolType enum (Foldseek, USalign)
 │   ├── struct_sim_tool.py           # Abstract base class for tools
 │   ├── foldseek.py                  # Foldseek implementation
-│   ├── tmalign.py                   # TMalign implementation
 │   ├── usalign.py                   # USalign implementation
 │   └── struct_sim_computer.py       # Orchestrates tool selection/execution
 ├── utils/                           # Shared utilities
@@ -61,7 +60,7 @@ src/clans3d/
 
 ### Similarity Computation
 
-- **ToolType enum** [`src/clans3d/similarity/tool_type.py`]: Foldseek, TMalign, USalign
+- **ToolType enum** [`src/clans3d/similarity/tool_type.py`]: Foldseek, USalign
 - **StructSimTool** [`src/clans3d/similarity/struct_sim_tool.py`]: Abstract base class with subclass pattern
   - Subclasses override `start_run()` for tool-specific initialization and `_parse_output()` for score extraction
   - All tools compute all pairwise scores (expected count: `n*(n-1)/2` where n = number of structures)
@@ -125,11 +124,11 @@ clans3d -l input.fasta -i fasta -t foldseek [-s evalue|TM] [-c config.conf]
 
 - **Subprocess execution** [`StructSimTool._execute_run()`]:
   - Tools run as subprocesses with captured output
-  - Must handle tool-specific output parsing (Foldseek: TSV, TMalign/USalign: custom formats)
+  - Must handle tool-specific output parsing (Foldseek: TSV, USalign: custom format)
   - Tools expected in system PATH
 - **Database/Index creation**:
   - Foldseek: Creates `.dbtype`, `.index`, `.lookup` files in working_dir
-  - TMalign/USalign: No pre-processing needed
+  - USalign: No pre-processing needed
 
 ### Configuration System
 
@@ -177,7 +176,7 @@ clans3d -l input.fasta -i fasta -t foldseek [-s evalue|TM] [-c config.conf]
 - **Python 3.10+** with pip packages (see pyproject.toml): pandas, scipy, scikit-learn, hdbscan, networkx, igraph, leidenalg, biopython, matplotlib, seaborn
 - **External tools** must be in PATH:
   - foldseek (fast similarity computation)
-  - TMalign, USalign (slower, structure alignment)
+  - USalign (slower, structure alignment)
 - **CLANS software**: For visualization (headless execution via `clans3d.legacy.utils_old_clans`)
 - **PDB database access**: For structure retrieval (AlphaFold DB, online PDB queries)
 

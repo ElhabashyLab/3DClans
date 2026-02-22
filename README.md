@@ -10,7 +10,6 @@ It supports multiple input formats
 It uses various structural similarity tools to compute pairwise structural similarities:
 
 - Foldseek
-- TM-align
 - US-align
 
 The resulting clans files can be used for further analysis and visualization of protein structure relationships with the CLANS software.
@@ -27,7 +26,6 @@ The resulting clans files can be used for further analysis and visualization of 
 The following external tools need to be installed and accessible in your system's PATH:
 
 - foldseek
-- TMalign
 - USalign
 
 ### Creating a Virtual Environment and Installing Dependencies
@@ -68,7 +66,6 @@ The resulting clans file will be saved in the `clans_files` directory.
 
     Accepted values: `fasta`, `tsv`, `a2m`.  
     This tells the program how to parse the input.
-
     - **FASTA**: expects a standard FASTA file with sequence identifiers and sequences.  
       The header should specify the region of interest using the format: `>identifier/start-end`  
       Example: `>sp|P49811|MYOD1_PIG/2-300`
@@ -89,10 +86,9 @@ The resulting clans file will be saved in the `clans_files` directory.
 
 3.  `--tool/-t` : Structural similarity tool to use.
 
-    Choose the tool you want: `foldseek`, `tmalign`, `usalign`
-
+    Choose the tool you want: `foldseek`, `usalign`
     - _foldseek_: fast
-    - _TMalign/USalign_: slower, more accurate
+    - _USalign_: slower, more accurate
 
     Example: `--tool foldseek`
 

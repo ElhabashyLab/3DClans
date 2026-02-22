@@ -2,7 +2,6 @@ import logging
 import os
 
 from clans3d.similarity.usalign import USalign
-from clans3d.similarity.tmalign import TMalign
 from clans3d.similarity.foldseek import Foldseek
 from clans3d.similarity.tool_type import ToolType
 from clans3d.similarity.struct_sim_tool import StructSimTool
@@ -46,7 +45,5 @@ class StructSimComputer:
             return Foldseek(self.foldseek_score)
         elif tool_type == ToolType.USALIGN:
             return USalign()
-        elif tool_type == ToolType.TMALIGN:
-            return TMalign()
         else:
             raise ValueError(f"Tool {tool_type.value} is not available.")

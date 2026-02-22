@@ -33,7 +33,6 @@ def verify_tool_dependencies(tool_type: ToolType) -> None:
     
     tool_map = {
         ToolType.FOLDSEEK: "foldseek",
-        ToolType.TMALIGN: "TMalign",
         ToolType.USALIGN: "USalign"
     }
     
