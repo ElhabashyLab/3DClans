@@ -3,9 +3,8 @@ import os
 import requests
 import pandas as pd
 from Bio import SeqIO
-from Bio.PDB.PDBIO import PDBIO
-from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.MMCIFParser import MMCIFParser
+from Bio.PDB.mmcifio import MMCIFIO
 from Bio.PDB.PDBIO import Select
 from clans3d.core.input_file_type import InputFileType
 from clans3d.utils.file_utils import download_file, reset_dir_content
@@ -113,7 +112,7 @@ def download_alphafold_structure(
     id: str,
     output_dir: str,
     region: tuple[int, int] | None,
-    file_format: str = "pdb",
+    file_format: str = "cif",
 ) -> bool:
     """
     Downloads the AlphaFold-predicted structure for a given structure-ID (f.e. Uniprot-ID) and saves it
@@ -125,7 +124,7 @@ def download_alphafold_structure(
         id (str): accession-id of the structure.
         output_dir (str): Directory where the structure file will be saved.
         region (tuple[int, int] | None): Residue range [start, end] to extract (1-based, inclusive).
-        file_format (str): Structure format to download ("pdb" or "cif").
+        file_format (str): Structure format to download ("pdb" or "cif"). Defaults to "cif".
 
     Returns:
         bool: True if the structure was successfully downloaded (and processed),
@@ -175,108 +174,25 @@ def download_alphafold_structure(
 def extract_region_of_protein(path_to_protein: str, file_type: str, region: tuple[int, int], output_path = None):
     """
     Extracts a specific residue range from a protein structure file (PDB or CIF)
-    without corrupting metadata. Writes output to a new file by default.
+    and writes the filtered structure to a new file.
     
     Args:
         path_to_protein (str): Path to the protein structure file.
         file_type (str): 'pdb' or 'cif'.
-        region (tuple[int, int]): (start, end) residue indices to extract.
-        output_path (str, optional): Path to save extracted structure. Defaults to adding '_region' suffix.
+        region (tuple[int, int]): (start, end) residue indices to extract (1-based, inclusive).
+        output_path (str, optional): Path to save extracted structure. Defaults to adding '_roi' suffix.
     """
     logger.debug("Extracting region %s from protein file: %s", region, path_to_protein)
     class SelectRegion(Select):
         def accept_residue(self, residue):
             return region[0] <= residue.id[1] <= region[1]
 
-    parser = PDBParser(QUIET=True) if file_type == "pdb" else MMCIFParser(QUIET=True)
+    parser = MMCIFParser(QUIET=True)
     structure = parser.get_structure("protein", path_to_protein)
     if output_path is None:
         root, ext = os.path.splitext(path_to_protein)
         output_path = f"{root}_roi{ext}"
-    meta_data = get_meta_data_of_structure_file(path_to_protein)
-    meta_data_corrected = adapt_metadata_to_region(meta_data, region)
-    with open(output_path, "w") as out:
-        out.writelines(meta_data_corrected)
-        io = PDBIO()
-        io.set_structure(structure)
-        io.save(out, select=SelectRegion())
+    io = MMCIFIO()
+    io.set_structure(structure)
+    io.save(output_path, select=SelectRegion())
     return output_path
-
-
-def adapt_metadata_to_region(meta_data: list[str], region: tuple[int, int]) -> list[str]:
-    """
-    Adapts the metadata lines of a structure file to reflect the extracted region.
-    
-    Args:
-        meta_data (list[str]): Original metadata lines.
-        region (tuple[int, int]): [start, end] residue indices.
-        
-    Returns:
-        list[str]: Adapted metadata lines.
-    """
-    adapted_lines = []
-    for line in meta_data:
-        if line.startswith("DBREF"):
-            adapted_line = handle_DBREF_line(line, region)
-            adapted_lines.append(adapted_line)
-        elif line.startswith("SEQRES"):
-            parts = line.split()
-            num_residues_region = region[1] - region[0] + 1
-            parts[3] = str(num_residues_region)  # update number of residues
-            adapted_line = " ".join(parts) + "\n"
-            adapted_lines.append(adapted_line)
-            # Note: Further adjustments to 3-letter code listing is not done yet.
-        else:
-            adapted_lines.append(line)
-    return adapted_lines
-
-
-def handle_DBREF_line(line: str, region: tuple[int, int]) -> str:
-    """
-    Adapts a DBREF line to reflect the extracted region.
-    
-    Args:
-        line (str): Original DBREF line.
-        region (tuple[int, int]): [start, end] residue indices.
-        
-    Returns:
-        str: Adapted DBREF line.
-    """
-    region_start = region[0]
-    region_end = region[1]
-    parts = line.split()
-    parts = line.split()
-    struct_start = int(parts[3])
-    struct_end = int(parts[4])
-    uniprot_start = int(parts[8])
-    uniprot_end = int(parts[9])
-    offset_start = struct_start - uniprot_start
-    offset_end = struct_end - uniprot_end
-    uniprot_start_corrected = region_start - offset_start
-    uniprot_end_corrected = region_end - offset_end
-    parts[3] = str(region_start) # new structure start reflects region start
-    parts[4] = str(region_end) # new structure end reflects region end
-    parts[8] = str(uniprot_start_corrected) # new uniprot start reflects region start (corrected by possible offset)
-    parts[9] = str(uniprot_end_corrected) # new uniprot end reflects region end (corrected by possible offset)
-    adapted_line = " ".join(parts) + "\n"
-    return adapted_line
-
-
-def get_meta_data_of_structure_file(path_to_protein: str) -> list[str]:
-    """
-    Extracts the meta data from a structure file (PDB or CIF). This includes header lines before the ATOM/HETATM lines.
-    
-    Args:
-        path_to_protein (str): Path to the protein structure file.
-        file_type (str): 'pdb' or 'cif'.
-    Returns:
-        list[str]: List of meta data lines.
-    """
-    with open(path_to_protein, "r") as f:
-        lines = f.readlines()
-        header_lines = []
-        for line in lines:
-            if line.startswith(("ATOM", "HETATM", "MODEL")):
-                break
-            header_lines.append(line)
-    return header_lines

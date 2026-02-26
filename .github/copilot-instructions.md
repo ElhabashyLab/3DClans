@@ -166,6 +166,13 @@ clans3d -l input.fasta -i fasta -t foldseek [-s evalue|TM] [-c config.conf]
 - Tool working directories cleaned/reset per run (see `reset_dir_content()` in utils)
 - Coordinates computed from CLANS layout; not user-provided
 
+### Structure File Format
+
+- All structure files are stored and processed in **CIF (mmCIF)** format internally
+- AlphaFold structures are downloaded as CIF via the `cifUrl` field
+- Region extraction uses `MMCIFParser` + `MMCIFIO` from BioPython (no PDB-specific metadata handling)
+- Both Foldseek and USalign accept CIF natively; no format conversion needed
+
 ### File Naming
 
 - All Python source files use `snake_case` naming
