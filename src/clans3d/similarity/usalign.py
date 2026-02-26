@@ -23,9 +23,14 @@ class USalign(StructSimTool):
         self.outfmt = "2"
         
         
-    def start_run(self, structures_dir):
+    def start_run(self, structures_dir: str) -> pd.DataFrame:
         """
         Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run with the specified structures_dir.
+        
+        Args:
+            structures_dir (str): The directory containing the structure files to be compared.
+        Returns:
+            pd.DataFrame: A DataFrame containing the similarity scores between the structures.
         """
         # clean working directory before running
         reset_dir_content(self.working_dir)        
@@ -40,7 +45,7 @@ class USalign(StructSimTool):
         return self._execute_run()
 
     
-    def _parse_output(self):
+    def _parse_output(self) -> pd.DataFrame:
         """
         Parses the output of the tool to extract the similarity scores.
         """
@@ -61,7 +66,7 @@ class USalign(StructSimTool):
                 return df2
             else:
                 logger.error("Failed to parse output: DataFrame is empty.")
-                return False
+                return pd.DataFrame()  # Return an empty DataFrame if the output is empty
         except Exception as e:
             logger.error("Error parsing output: %s", e)
-            return False
+            return pd.DataFrame()  # Return an empty DataFrame on parsing error

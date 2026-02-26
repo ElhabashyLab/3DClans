@@ -42,7 +42,7 @@ class Foldseek(StructSimTool):
         return output_columns
 
 
-    def start_run(self, structures_dir):
+    def start_run(self, structures_dir: str) -> pd.DataFrame:
         """
         Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run.
         This method should be overridden by subclasses to implement specific tool logic.
@@ -56,6 +56,11 @@ class Foldseek(StructSimTool):
         
         (converting into readable output)
         foldseek convertalis <i:queryDb> <i:targetDb> <i:alignmentDB> <o:alignmentFile> [options][/+][-]
+        
+        Args:
+            structures_dir (str): The directory containing the structure files to be compared.
+        Returns:
+            pd.DataFrame: A DataFrame containing the similarity scores between the structures.
         """
         # clean working directory before running
         reset_dir_content(self.working_dir)
@@ -70,7 +75,7 @@ class Foldseek(StructSimTool):
         return self._execute_run()
 
 
-    def _create_database(self, structures_dir, db_name):
+    def _create_database(self, structures_dir: str, db_name: str):
         """
         Creates a foldseek database named db_name from the given structures directory.
         """
@@ -88,7 +93,7 @@ class Foldseek(StructSimTool):
             return False
 
 
-    def _parse_output(self):
+    def _parse_output(self) -> pd.DataFrame:
         """
         Parses the output of the tool to extract self.score.
         """
@@ -108,13 +113,18 @@ class Foldseek(StructSimTool):
             logger.error("Error running %s with %s: %s", self.name, convertalis_command, e)
             logger.debug("stdout: %s", e.stdout)
             logger.debug("stderr: %s", e.stderr)
-            return False
+            return pd.DataFrame()  # Return an empty DataFrame on error
 
 
-    def _clean_scores(self, df):
+    def _clean_scores(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Receives a DataFrame containing the columns 'Sequence_ID_1, Sequence_ID_2, score'
-        and returns a cleaned DataFrame with no duplicate rows like Sequence_ID_1:Sequence_ID_2 and Sequence_ID_2:Sequence_ID_1
+        Receives a DataFrame containing the columns 'Sequence_ID_1, Sequence_ID_2, score' and returns a cleaned DataFrame with no duplicate rows.
+        The score is transformed based on self.score (if self.score is "TM", the maximum of TM1 and TM2 is taken and transformed to a distance metric by 1 - maxTM, if self.score is "evalue", the evalue is taken as score).
+        
+        Args:
+            df (pd.DataFrame): A DataFrame containing the columns 'Sequence_ID_1, Sequence_ID_2, score'
+        Returns:
+            pd.DataFrame: A cleaned DataFrame with no duplicate rows.
         """
         # remove duplicates like A:B and B:A
         df["pairs"] = df.apply(lambda row: tuple(sorted([row['Sequence_ID_1'], row['Sequence_ID_2']])), axis=1)

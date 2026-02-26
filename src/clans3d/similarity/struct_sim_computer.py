@@ -29,12 +29,9 @@ class StructSimComputer:
         num_structures = len(os.listdir(structures_dir))
         expected_number_of_scores = (num_structures * (num_structures + 1) // 2) - num_structures
         scores = tool.start_run(structures_dir)
-        if scores is None or len(scores) != expected_number_of_scores:
-            if scores is None:
-                len_scores = 0
-            else:
-                len_scores = len(scores)
-            logger.warning("%s did not return the expected number of scores. Expected %d, got %d.", tool.name, expected_number_of_scores, len_scores)
+        number_scores = len(scores)
+        if number_scores != expected_number_of_scores:
+            logger.warning("%s did not return the expected number of scores. Expected %d, got %d.", tool.name, expected_number_of_scores, number_scores)
         logger.info("Structural similarity computation with %s completed.", tool.name)
         return scores
         
