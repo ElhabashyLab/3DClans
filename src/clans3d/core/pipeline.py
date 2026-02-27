@@ -131,6 +131,7 @@ class ClansPipeline:
         Returns:
             Path to the cleaned FASTA file.
         """
+        logger.info("Generating cleaned FASTA file with downloaded structures...")
         os.makedirs(self.config.input_storage_dir, exist_ok=True)
         input_file_name = os.path.basename(self.config.input_file).split(".")[0]
         cleaned_path = os.path.join(

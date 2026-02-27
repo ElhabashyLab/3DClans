@@ -12,7 +12,10 @@ PROGRESS_LOG_INTERVAL = 5
 
 class StructSimTool():
     """
-    This module defines a base class for tools that can be used in a benchmarking context.
+    Base class for structural similarity tools.
+    
+    Subclasses must implement :meth:`start_run`, :meth:`_parse_output`,
+    and :meth:`_log_progress`.
     """
     def __init__(self, name: str, description: str, working_dir: str):
         self.name = name
@@ -20,9 +23,10 @@ class StructSimTool():
         self.working_dir = working_dir
         self.command = []
         self.output = None
+        self.expected_number_of_scores = 0
         
         
-    def start_run(self, structures_dir: str) -> pd.DataFrame:
+    def start_run(self, structures_dir: str, expected_number_of_scores: int) -> pd.DataFrame:
         """
         Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run.
         This method should be overridden by subclasses to implement specific tool logic.
@@ -30,15 +34,22 @@ class StructSimTool():
         raise NotImplementedError("Subclasses should implement this method to run the tool.")
     
     
-    def _execute_run(self) -> pd.DataFrame:
+    def _execute_run(self, expected_number_of_scores: int) -> pd.DataFrame:
         """
-        Executes self.command in a subprocess and captures the output.
-        Streams stderr and logs it at regular intervals so the user
-        can see that the tool is still running.
+        Executes ``self.command`` via ``Popen`` and streams the output,
+        periodically calling :meth:`_log_progress` so the user can
+        track that the tool is still running.
+        
+        Args:
+            expected_number_of_scores: The expected number of pairwise
+                scores.  Stored on the instance and available to
+                :meth:`_log_progress` for percentage calculation.
         
         Returns:
-            pd.DataFrame: A DataFrame containing the similarity scores between the structures.
+            A DataFrame with the parsed similarity scores, or an empty
+            DataFrame on error.
         """
+        self.expected_number_of_scores = expected_number_of_scores
         logger.debug("Running command: %s", " ".join(self.command))
         try:
             process = subprocess.Popen(
@@ -129,46 +140,34 @@ class StructSimTool():
     def _poll_and_log(self, process: subprocess.Popen,
                       stdout_reader: dict, stderr_reader: dict) -> None:
         """
-        Block until *process* finishes, logging progress at regular
-        intervals.
+        Block until *process* finishes, calling :meth:`_log_progress`
+        every ``PROGRESS_LOG_INTERVAL`` seconds.
 
-        Every ``PROGRESS_LOG_INTERVAL`` seconds the latest captured
-        output line is emitted via :func:`logging.info`.  ``stderr`` is
-        preferred (where tools like Foldseek write progress bars), with
-        a fallback to ``stdout`` (used by USalign).
-
-        A final log entry is emitted once the process exits so the user
-        always sees the last status.
+        A final call is made after the process exits so the user always
+        sees the last status.
 
         Args:
             process:        The running subprocess to monitor.
-            stdout_reader:  Reader dict returned by
-                :meth:`_start_pipe_reader` for stdout.
-            stderr_reader:  Reader dict returned by
-                :meth:`_start_pipe_reader` for stderr.
+            stdout_reader:  Reader dict for the stdout pipe.
+            stderr_reader:  Reader dict for the stderr pipe.
         """
         while process.poll() is None:
             time.sleep(PROGRESS_LOG_INTERVAL)
-            self._log_latest(stdout_reader, stderr_reader)
+            self._log_progress(stdout_reader, stderr_reader)
         # One final log after the process exits
-        self._log_latest(stdout_reader, stderr_reader)
+        self._log_progress(stdout_reader, stderr_reader)
 
 
-    def _log_latest(self, stdout_reader: dict,
-                    stderr_reader: dict) -> None:
+    def _log_progress(self, stdout_reader: dict,
+                      stderr_reader: dict) -> None:
         """
-        Log the most recent non-empty output line.
-
-        Prefers the ``stderr`` stream (common for progress output),
-        falling back to ``stdout`` if stderr has nothing new.
+        Log a progress message based on the current subprocess output.
 
         Args:
             stdout_reader: Reader dict for the stdout pipe.
             stderr_reader: Reader dict for the stderr pipe.
         """
-        latest = stderr_reader["latest_line"] or stdout_reader["latest_line"]
-        if latest:
-            logger.info("%s: %s", self.name, latest)
+        raise NotImplementedError("Subclasses should implement this method to log progress during execution.")
 
     
     def _parse_output(self) -> pd.DataFrame:

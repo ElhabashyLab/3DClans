@@ -23,12 +23,13 @@ class USalign(StructSimTool):
         self.outfmt = "2"
         
         
-    def start_run(self, structures_dir: str) -> pd.DataFrame:
+    def start_run(self, structures_dir: str, expected_number_of_scores: int) -> pd.DataFrame:
         """
         Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run with the specified structures_dir.
         
         Args:
             structures_dir (str): The directory containing the structure files to be compared.
+            expected_number_of_scores (int): The expected number of scores to be returned by the tool, used for logging purposes.
         Returns:
             pd.DataFrame: A DataFrame containing the similarity scores between the structures.
         """
@@ -42,9 +43,48 @@ class USalign(StructSimTool):
                 f.write(f"{structure_name}\n")
         # example command: "USalign -dir structures_dir/ structure_names.txt -outfmt 2"
         self.command = [self.name, self.flag_dir, structures_dir + "/", structure_names_list, self.flag_outfmt, self.outfmt]
-        return self._execute_run()
+        return self._execute_run(expected_number_of_scores)
 
     
+    def _log_progress(self, stdout_reader: dict,
+                      stderr_reader: dict) -> None:
+        """Log USalign progress by counting completed alignment pairs.
+
+        USalign writes one TSV data line per pair to stdout (plus a
+        header and occasional warnings).  This method counts the data
+        lines read so far and logs a percentage based on
+        ``self.expected_number_of_scores``.
+
+        Args:
+            stdout_reader: Reader dict for the stdout pipe.
+            stderr_reader: Reader dict for the stderr pipe.
+        """
+        pairs_done = self._count_data_lines(stdout_reader)
+        if self.expected_number_of_scores > 0:
+            percent = min(100, (pairs_done / self.expected_number_of_scores) * 100)
+            logger.info(f"{self.name}: Aligning pairs – {int(percent)}% ({pairs_done}/{self.expected_number_of_scores})")
+        else:
+            logger.info(f"{self.name}: Aligned {pairs_done} pairs so far")
+
+
+    @staticmethod
+    def _count_data_lines(stdout_reader: dict) -> int:
+        """Count USalign result lines (excluding header and warnings).
+
+        Args:
+            stdout_reader: Reader dict for the stdout pipe.
+
+        Returns:
+            Number of data lines read so far.
+        """
+        count = 0
+        for line in stdout_reader["chunks"]:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and not stripped.startswith("Warning"):
+                count += 1
+        return count
+
+
     def _parse_output(self) -> pd.DataFrame:
         """
         Parses the output of the tool to extract the similarity scores.

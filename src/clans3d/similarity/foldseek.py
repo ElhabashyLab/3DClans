@@ -27,7 +27,7 @@ class Foldseek(StructSimTool):
         self.flag_a = "-a" # enables foldseek to store alignment backtrace information (needed for TM scores)
         self.exhaustive_search = "--exhaustive-search" # enables exhaustive search (slower but more accurate/skips prefiltering)
         self.e = "-e" # e-value threshold for foldseek search
-        
+        self._last_logged_phase: str = ""
 
     def _get_output_columns_from_self_score(self):
         """
@@ -42,7 +42,7 @@ class Foldseek(StructSimTool):
         return output_columns
 
 
-    def start_run(self, structures_dir: str) -> pd.DataFrame:
+    def start_run(self, structures_dir: str, expected_number_of_scores: int) -> pd.DataFrame:
         """
         Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run.
         This method should be overridden by subclasses to implement specific tool logic.
@@ -59,6 +59,7 @@ class Foldseek(StructSimTool):
         
         Args:
             structures_dir (str): The directory containing the structure files to be compared.
+            expected_number_of_scores (int): The expected number of scores to be returned by the tool, used for logging purposes.
         Returns:
             pd.DataFrame: A DataFrame containing the similarity scores between the structures.
         """
@@ -72,7 +73,57 @@ class Foldseek(StructSimTool):
         self.alignmentDb = os.path.join(self.working_dir, "alignmentDb")
         self.tmpDir = os.path.join(self.working_dir, "tmpDir")
         self.command = [self.name, self.search, self.db, self.db, self.alignmentDb, self.tmpDir, self.flag_a] 
-        return self._execute_run()
+        return self._execute_run(expected_number_of_scores)
+
+
+    # ---- Foldseek phase keywords (in execution order) ----
+    _PHASE_KEYWORDS: list[tuple[str, str]] = [
+        ("counting k-mers",     "Indexing (counting k-mers) ..."),
+        ("index table: fill",   "Indexing (fill) ..."),
+        ("prefiltering",        "Prefiltering ..."),
+        ("structurealign",      "Structure alignment ..."),
+        ("convertalis",         "Converting results ..."),
+    ]
+
+    def _log_progress(self, stdout_reader: dict,
+                      stderr_reader: dict) -> None:
+        """Log Foldseek progress by detecting phase transitions.
+
+        When piped, Foldseek writes all output (including phase labels)
+        to stdout and nothing to stderr.  Progress bars only appear as
+        a final "done" line per phase, so instead of percentages this
+        method detects phase transitions and logs them once.
+
+        Args:
+            stdout_reader: Reader dict for the stdout pipe.
+            stderr_reader: Reader dict for the stderr pipe.
+        """
+        phase = self._detect_phase(stdout_reader)
+
+        if phase and phase != self._last_logged_phase:
+            self._last_logged_phase = phase
+            logger.info(f"{self.name}: {phase}")
+
+
+    def _detect_phase(self, reader: dict) -> str:
+        """Determine the current Foldseek processing phase.
+
+        Scans the captured stdout lines (from newest to oldest) for
+        known phase keywords and returns a human-readable label.
+
+        Args:
+            reader: Reader dict for the stdout pipe.
+
+        Returns:
+            A descriptive phase label, e.g. ``"Prefiltering"``,
+            or an empty string if no phase has been detected yet.
+        """
+        for raw_line in reversed(reader["chunks"]):
+            line_lower = raw_line.lower()
+            for keyword, label in self._PHASE_KEYWORDS:
+                if keyword in line_lower:
+                    return label
+        return ""
 
 
     def _create_database(self, structures_dir: str, db_name: str):
