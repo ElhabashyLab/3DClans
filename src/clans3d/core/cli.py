@@ -32,7 +32,7 @@ def _build_main_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-i", "--input_type",
         required=True,
-        choices=[t.value for t in InputFileType],
+        choices=[InputFileType.FASTA.value, InputFileType.A2M.value, InputFileType.TSV.value],
         help="specifies the type of the input file",
     )
 
@@ -65,6 +65,7 @@ def _build_main_parser() -> argparse.ArgumentParser:
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
         "-v", "--verbose",
+        required=False,
         action="store_true",
         default=False,
         help="enable verbose output with debug-level details",
@@ -72,6 +73,7 @@ def _build_main_parser() -> argparse.ArgumentParser:
 
     verbosity.add_argument(
         "-q", "--quiet",
+        required=False,
         action="store_true",
         default=False,
         help="disable all output except for errors",
@@ -102,6 +104,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     Returns:
         Parsed :class:`argparse.Namespace`.
     """
+    # grab argv from cli
     if argv is None:
         argv = sys.argv[1:]
 

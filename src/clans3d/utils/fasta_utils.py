@@ -12,6 +12,21 @@ from clans3d.utils.api_utils import uniprot_accessions_to_uniparc_accessions
 logger = logging.getLogger(__name__)
 
 
+def extract_records_from_fasta(fasta_file):
+    """
+    Extract all records from Fasta file.
+    All entries must contain a Uniprot_ID in the header.
+    :return: a list which contains all records
+    """
+    records = []
+    for entry in SeqIO.parse(fasta_file, "fasta"):
+        header = entry.id
+        uid = extract_uid_from_recordID(header)
+        record = SeqRecord(entry.seq, id=uid, description="")
+        records.append(record)
+    return records
+
+
 def extract_uids_from_fasta(fasta_file):
     """
     Extract all UniProt IDs from Fasta file.

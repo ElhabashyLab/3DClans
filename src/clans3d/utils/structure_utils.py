@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 def _log_interval(total: int) -> int:
-    """Return how often to log progress: every 10 items or every 10%, whichever is smaller."""
-    return max(1, min(10, total // 10))
+    """Return how often to log progress: every 10 items or every 20%, whichever is smaller."""
+    return max(1, min(10, total // 5))
 
 
 def fetch_structures(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict[str, tuple[int, int] | None]:

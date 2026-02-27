@@ -52,7 +52,7 @@ class PipelineConfig:
         quiet: bool = False,
         structures_dir: str = os.path.join("work", "structures"),
         output_dir: str = os.path.join("output", "clans_files"),
-        input_storage_dir: str = os.path.join("work", "input_file_storage"),
+        cleaned_input_storage: str = os.path.join("work", "cleaned_input_storage"),
     ):
         self.input_file = input_file
         self.input_type = input_type
@@ -62,7 +62,7 @@ class PipelineConfig:
         self.quiet = quiet
         self.structures_dir = structures_dir
         self.output_dir = output_dir
-        self.input_storage_dir = input_storage_dir
+        self.cleaned_input_storage = cleaned_input_storage
 
 
 class ClansPipeline:
@@ -89,15 +89,24 @@ class ClansPipeline:
         self._validate()
 
     def _validate(self) -> None:
-        """Validate pipeline configuration."""
+        # validate input file exists
         if not os.path.exists(self.config.input_file):
-            raise FileNotFoundError(
-                f"Input file not found: {self.config.input_file}"
-            )
-        if (
-            self.config.tool != ToolType.FOLDSEEK
-            and self.config.foldseek_score is not None
-        ):
+            raise FileNotFoundError(f"Input file not found: {self.config.input_file}")
+        
+        # check if input_type is compatible with input file extension
+        allowed_extensions = {
+            InputFileType.FASTA: InputFileType.FASTA.value,
+            InputFileType.A2M: InputFileType.A2M.value,
+            InputFileType.TSV: InputFileType.TSV.value
+            }
+        ext = os.path.basename(self.config.input_file).split(".")[1].lower()  # get extension without dot
+        if allowed_extensions[self.config.input_type] != ext:
+            raise ValueError(
+                f"Input file extension {ext} does not match expected "
+                f"type {self.config.input_type.value}.")
+        
+        # check foldseek_score is only set when tool is foldseek
+        if self.config.tool != ToolType.FOLDSEEK and self.config.foldseek_score is not None:
             raise ValueError(
                 "foldseek_score can only be specified when tool is Foldseek."
             )
@@ -123,7 +132,7 @@ class ClansPipeline:
     def generate_cleaned_fasta(
         self, uids_with_regions: dict[str, tuple[int, int] | None]
     ) -> str:
-        """Step 2: Generate a cleaned FASTA file from the fetched UIDs.
+        """Step 2: Generate a cleaned FASTA file from the structures which were able to be downloaded.
 
         Args:
             uids_with_regions: Mapping uid to optional (region_start, region_end).
@@ -132,10 +141,10 @@ class ClansPipeline:
             Path to the cleaned FASTA file.
         """
         logger.info("Generating cleaned FASTA file with downloaded structures...")
-        os.makedirs(self.config.input_storage_dir, exist_ok=True)
+        os.makedirs(self.config.cleaned_input_storage, exist_ok=True)
         input_file_name = os.path.basename(self.config.input_file).split(".")[0]
         cleaned_path = os.path.join(
-            self.config.input_storage_dir, f"{input_file_name}_cleaned.fasta"
+            self.config.cleaned_input_storage, f"{input_file_name}_cleaned.fasta"
         )
 
         if self.config.input_type == InputFileType.FASTA:
