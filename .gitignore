@@ -28,3 +28,9 @@ benchmark_output/
 
 # Notebook checkpoints
 .ipynb_checkpoints/
+
+# Test / coverage artefacts
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/

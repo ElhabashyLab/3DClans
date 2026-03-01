@@ -41,19 +41,26 @@ def extract_uids_from_fasta(fasta_file):
     return uids
 
 
-def clean_fasta_file(fasta_file, uids):
+def clean_fasta_file(fasta_file: str, uids: list[str], out_path: str) -> str:
     """
-    Cleans the fasta file by removing entries that are not in the given uid list.
-    :param fasta_file: path to the input fasta file
-    :param uids: list of UniProt IDs to keep
-    :return: path to the cleaned fasta file
+    Cleans the fasta file by removing entries that are not in the given uid list
+    and writes the result to *out_path*.
+
+    Args:
+        fasta_file (str): Path to the input FASTA file.
+        uids (list[str]): UniProt IDs to retain. Matching is done against
+            ``record.id`` as parsed by BioPython (the first whitespace-delimited
+            token of the FASTA header).
+        out_path (str): Destination path for the filtered FASTA file.
+
+    Returns:
+        str: *out_path* (the path passed in).
     """
-    cleaned_fasta_path = "cleaned.fasta"
-    with open(cleaned_fasta_path, 'w') as cleaned_fasta:
+    with open(out_path, 'w') as cleaned_fasta:
         for record in SeqIO.parse(fasta_file, "fasta"):
             if record.id in uids:
                 SeqIO.write(record, cleaned_fasta, "fasta")
-    return cleaned_fasta_path
+    return out_path
 
 
 def extract_uid_from_recordID(record_id):

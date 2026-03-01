@@ -93,7 +93,7 @@ class Benchmark:
             foldseek_score=score_type,
             structures_dir=self.structures_dir,
             output_dir=self.clans_dir,
-            input_storage_dir=self.work_dir,
+            cleaned_input_storage=self.work_dir,
         )
         return ClansPipeline(config)
     
