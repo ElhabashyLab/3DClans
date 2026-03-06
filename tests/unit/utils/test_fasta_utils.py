@@ -1,8 +1,12 @@
 """Unit tests for clans3d.utils.fasta_utils."""
 import os
 import pytest
+import requests
+from io import StringIO
+from unittest.mock import patch, MagicMock
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
+from Bio import SeqIO
 
 from clans3d.utils.fasta_utils import (
     extract_uid_from_recordID,
@@ -13,7 +17,27 @@ from clans3d.utils.fasta_utils import (
     extract_records_from_fasta,
     clean_fasta_file,
     copy_records_from_fasta,
+    download_fasta_record,
+    remove_non_existing_uniprot_accessions,
+    generate_fasta_from_uids_with_regions,
 )
+
+MODULE = "clans3d.utils.fasta_utils"
+
+
+def _fasta_response(uid="P11111", seq="ACDEFGHIKLM"):
+    """Mock requests.Response for a successful FASTA reply."""
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.text = f">sp|{uid}|PROT_HUMAN\n{seq}\n"
+    return resp
+
+
+def _not_found_response():
+    resp = MagicMock()
+    resp.status_code = 404
+    resp.text = ""
+    return resp
 
 
 # ---------------------------------------------------------------------------
@@ -29,8 +53,6 @@ class TestExtractUidFromRecordID:
         # version suffix stripped
         ("P49811.1", "P49811"),
         ("P49811", "P49811"),
-        # underscore-style: everything before first underscore
-        ("MYOD1_PIG", "MYOD1"),
     ])
     def test_common_formats(self, record_id, expected):
         assert extract_uid_from_recordID(record_id) == expected
@@ -42,6 +64,11 @@ class TestExtractUidFromRecordID:
         # header of the form "P12345/10-100" (no pipe, no underscore)
         result = extract_uid_from_recordID("P12345/10-100")
         assert result == "P12345"
+
+    def test_raises_for_gene_name_style(self):
+        # gene-name style IDs (e.g. "MYOD1_PIG") contain no UniProt accession
+        with pytest.raises(ValueError):
+            extract_uid_from_recordID("MYOD1_PIG")
 
 
 # ---------------------------------------------------------------------------
@@ -201,3 +228,232 @@ class TestCopyRecordsFromFasta:
         out_path = str(tmp_path / "out.fasta")
         copy_records_from_fasta(small_fasta_path, ["P11111", "P33333"], out_path)
         assert os.path.exists(out_path)
+
+
+# ---------------------------------------------------------------------------
+# download_fasta_record
+# ---------------------------------------------------------------------------
+
+class TestDownloadFastaRecord:
+    def test_returns_record_on_uniprot_success(self):
+        with patch(f"{MODULE}.requests.get", return_value=_fasta_response("P11111")):
+            record = download_fasta_record("P11111")
+        assert isinstance(record, SeqRecord)
+
+    def test_queries_uniprot_first(self):
+        with patch(f"{MODULE}.requests.get", return_value=_fasta_response()) as mock_get:
+            download_fasta_record("P11111", upi="UPI000")
+        first_url = mock_get.call_args_list[0][0][0]
+        assert "uniprotkb" in first_url
+
+    def test_only_uniprot_queried_when_it_succeeds(self):
+        with patch(f"{MODULE}.requests.get", return_value=_fasta_response()) as mock_get:
+            download_fasta_record("P11111", upi="UPI000")
+        assert mock_get.call_count == 1
+
+    def test_falls_back_to_uniparc_on_uniprot_404(self):
+        responses = [_not_found_response(), _fasta_response("P11111")]
+        with patch(f"{MODULE}.requests.get", side_effect=responses):
+            record = download_fasta_record("P11111", upi="UPI000")
+        assert isinstance(record, SeqRecord)
+
+    def test_uniparc_url_contains_upi(self):
+        responses = [_not_found_response(), _fasta_response()]
+        with patch(f"{MODULE}.requests.get", side_effect=responses) as mock_get:
+            download_fasta_record("P11111", upi="UPI000ABC")
+        second_url = mock_get.call_args_list[1][0][0]
+        assert "UPI000ABC" in second_url
+
+    def test_raises_value_error_when_uniprot_404_and_no_upi(self):
+        with patch(f"{MODULE}.requests.get", return_value=_not_found_response()):
+            with pytest.raises(ValueError, match="not found"):
+                download_fasta_record("P11111")
+
+    def test_raises_value_error_when_both_endpoints_404(self):
+        with patch(f"{MODULE}.requests.get", return_value=_not_found_response()):
+            with pytest.raises(ValueError, match="not found"):
+                download_fasta_record("P11111", upi="UPI000")
+
+    def test_network_error_propagates_without_upi(self):
+        with patch(f"{MODULE}.requests.get", side_effect=requests.ConnectionError()):
+            with pytest.raises(requests.exceptions.RequestException):
+                download_fasta_record("P11111")
+
+    def test_region_applied_to_downloaded_record(self):
+        seq = "A" * 50
+        with patch(f"{MODULE}.requests.get", return_value=_fasta_response("P11111", seq)):
+            record = download_fasta_record("P11111", region=(1, 10))
+        assert len(record.seq) == 10
+
+    def test_no_region_returns_full_sequence(self):
+        seq = "ACDEFGHIKLM"
+        with patch(f"{MODULE}.requests.get", return_value=_fasta_response("P11111", seq)):
+            record = download_fasta_record("P11111")
+        assert len(record.seq) == len(seq)
+
+    def test_response_body_not_starting_with_gt_treated_as_not_found(self):
+        # UniProt sometimes returns error messages without FASTA format
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.text = "Error: entry not found"
+        with patch(f"{MODULE}.requests.get", return_value=resp):
+            with pytest.raises(ValueError):
+                download_fasta_record("P11111")
+
+
+# ---------------------------------------------------------------------------
+# remove_non_existing_uniprot_accessions
+# ---------------------------------------------------------------------------
+
+class TestRemoveNonExistingUniprotAccessions:
+    API_MODULE = "clans3d.utils.fasta_utils.uniprot_accessions_to_uniparc_accessions"
+
+    def _uid_to_upi(self, uids):
+        return {uid: f"UPI_{uid}" for uid in uids}
+
+    def test_retains_all_when_all_found(self):
+        uids = ["P11111", "P22222"]
+        with patch(self.API_MODULE, return_value=self._uid_to_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", return_value=MagicMock()):
+            result = remove_non_existing_uniprot_accessions(uids)
+        assert result == ["P11111", "P22222"]
+
+    def test_removes_uid_when_value_error_raised(self):
+        uids = ["P11111", "P22222"]
+        def download_side_effect(uid, **kwargs):
+            if uid == "P22222":
+                raise ValueError("not found")
+            return MagicMock()
+        with patch(self.API_MODULE, return_value=self._uid_to_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", side_effect=download_side_effect):
+            result = remove_non_existing_uniprot_accessions(uids)
+        assert "P11111" in result
+        assert "P22222" not in result
+
+    def test_removes_uid_when_network_error_raised(self):
+        uids = ["P11111", "P22222"]
+        def download_side_effect(uid, **kwargs):
+            if uid == "P11111":
+                raise requests.ConnectionError()
+            return MagicMock()
+        with patch(self.API_MODULE, return_value=self._uid_to_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", side_effect=download_side_effect):
+            result = remove_non_existing_uniprot_accessions(uids)
+        assert "P11111" not in result
+        assert "P22222" in result
+
+    def test_returns_empty_list_when_all_fail(self):
+        uids = ["P11111", "P22222"]
+        with patch(self.API_MODULE, return_value=self._uid_to_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", side_effect=ValueError("not found")):
+            result = remove_non_existing_uniprot_accessions(uids)
+        assert result == []
+
+    def test_empty_input_returns_empty_list(self):
+        with patch(self.API_MODULE, return_value={}):
+            result = remove_non_existing_uniprot_accessions([])
+        assert result == []
+
+    def test_upi_is_passed_to_download(self):
+        uids = ["P11111"]
+        calls = []
+        def capture(uid, **kwargs):
+            calls.append(kwargs.get("upi"))
+            return MagicMock()
+        with patch(self.API_MODULE, return_value={"P11111": "UPI_ABC"}), \
+             patch(f"{MODULE}.download_fasta_record", side_effect=capture):
+            remove_non_existing_uniprot_accessions(uids)
+        assert calls == ["UPI_ABC"]
+
+
+# ---------------------------------------------------------------------------
+# generate_fasta_from_uids_with_regions
+# ---------------------------------------------------------------------------
+
+class TestGenerateFastaFromUidsWithRegions:
+    API_MODULE = "clans3d.utils.fasta_utils.uniprot_accessions_to_uniparc_accessions"
+
+    def _no_upi(self, uids):
+        return {uid: None for uid in uids}
+
+    def test_with_original_fasta_copies_records(self, small_fasta_path, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        uids_with_regions = {"P11111": None, "P22222": None}
+        generate_fasta_from_uids_with_regions(uids_with_regions, out, original_fasta=small_fasta_path)
+        written = [r.id for r in SeqIO.parse(out, "fasta")]
+        # only the two requested UIDs should appear
+        assert any("P11111" in uid for uid in written)
+        assert any("P22222" in uid for uid in written)
+        assert not any("P33333" in uid for uid in written)
+
+    def test_with_original_fasta_returns_out_path(self, small_fasta_path, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        result = generate_fasta_from_uids_with_regions({"P11111": None}, out, original_fasta=small_fasta_path)
+        assert result == out
+
+    def test_without_original_fasta_returns_out_path(self, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        uids = {"P11111": None}
+        with patch(self.API_MODULE, return_value=self._no_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", return_value=SeqRecord(Seq("ACDE"), id="P11111", description="")):
+            result = generate_fasta_from_uids_with_regions(uids, out)
+        assert result == out
+
+    def test_without_original_fasta_writes_file(self, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        uids = {"P11111": None}
+        with patch(self.API_MODULE, return_value=self._no_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", return_value=SeqRecord(Seq("ACDE"), id="P11111", description="")):
+            generate_fasta_from_uids_with_regions(uids, out)
+        assert os.path.exists(out)
+
+    def test_record_id_set_to_uid(self, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        uids = {"P11111": None}
+        with patch(self.API_MODULE, return_value=self._no_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", return_value=SeqRecord(Seq("ACDE"), id="sp|P11111|PROT_HUMAN", description="")):
+            generate_fasta_from_uids_with_regions(uids, out)
+        records = list(SeqIO.parse(out, "fasta"))
+        assert records[0].id == "P11111"
+
+    def test_uses_mock_up_when_download_fails(self, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        uids = {"P11111": None}
+        with patch(self.API_MODULE, return_value=self._no_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", side_effect=ValueError("not found")):
+            generate_fasta_from_uids_with_regions(uids, out)
+        records = list(SeqIO.parse(out, "fasta"))
+        assert len(records) == 1
+        assert str(records[0].seq) == "not_found"
+
+    def test_mock_up_used_on_network_error(self, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        uids = {"P11111": None}
+        with patch(self.API_MODULE, return_value=self._no_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", side_effect=requests.ConnectionError()):
+            generate_fasta_from_uids_with_regions(uids, out)
+        records = list(SeqIO.parse(out, "fasta"))
+        assert str(records[0].seq) == "not_found"
+
+    def test_partial_failure_writes_both_real_and_mockup(self, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        uids = {"P11111": None, "P22222": None}
+        def download_side_effect(uid, *args, **kwargs):
+            if uid == "P22222":
+                raise ValueError("not found")
+            return SeqRecord(Seq("ACDE"), id=uid, description="")
+        with patch(self.API_MODULE, return_value=self._no_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", side_effect=download_side_effect):
+            generate_fasta_from_uids_with_regions(uids, out)
+        records = list(SeqIO.parse(out, "fasta"))
+        assert len(records) == 2
+        seqs = {r.id: str(r.seq) for r in records}
+        assert seqs["P11111"] == "ACDE"
+        assert seqs[next(k for k in seqs if "P22222" in k)] == "not_found"
+
+    def test_empty_input_writes_empty_file(self, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        with patch(self.API_MODULE, return_value={}):
+            generate_fasta_from_uids_with_regions({}, out)
+        records = list(SeqIO.parse(out, "fasta"))
+        assert records == []

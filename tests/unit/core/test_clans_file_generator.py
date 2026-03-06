@@ -111,6 +111,13 @@ class TestParsePosBlock:
                   and "0.4" not in l and "0.7" not in l]
         with pytest.raises(ValueError):
             generator._parse_pos_block(no_pos)
+            
+    def test_raises_when_malformed_line(self, generator):
+        malformed_pos = [l for l in MINIMAL_CLANS_LINES if "pos" not in l and "0.1" not in l
+                         and "0.4" not in l and "0.7" not in l]
+        malformed_pos.append("0 0.1 0.2")  # missing z coordinate
+        with pytest.raises(ValueError):
+            generator._parse_pos_block(malformed_pos)
 
 
 # ---------------------------------------------------------------------------

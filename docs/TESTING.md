@@ -1,5 +1,49 @@
 # Testing Guide for Clans-3D
 
+## Running Tests
+
+All test commands below assume you are in the project root and the virtual environment is active.
+
+### Unit tests (fast, no external tools or network required)
+
+```bash
+pytest tests/unit/
+```
+
+With coverage report:
+
+```bash
+pytest tests/unit/ --cov=src/clans3d --cov-report=term-missing
+```
+
+Target a specific module:
+
+```bash
+pytest tests/unit/utils/test_fasta_utils.py
+```
+
+Run a single test by name:
+
+```bash
+pytest tests/unit/utils/test_fasta_utils.py::test_extract_uid_from_record_id
+```
+
+### All non-E2E tests (unit + integration + regression)
+
+```bash
+pytest tests/ -m "not e2e"
+```
+
+### E2E tests (requires Foldseek / USalign in PATH)
+
+```bash
+pytest tests/ -m e2e
+```
+
+> **Note:** E2E tests are not yet implemented. The `-m e2e` flag and the `e2e/` directory are reserved for them.
+
+---
+
 ## Overview
 
 This document outlines the testing strategy for Clans-3D. Because the application integrates external binaries (Foldseek, USalign), network APIs (UniProt), and file I/O-heavy workflows, tests are split into several layers with different requirements and run frequencies.

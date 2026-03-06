@@ -156,16 +156,18 @@ class ClansPipeline:
                 uids_with_regions, cleaned_path
             )
 
-    def compute_scores(self) -> pd.DataFrame:
+    def compute_scores(self, structures) -> pd.DataFrame:
         """Step 3: Compute pairwise structural similarity scores.
-
+        
+        Args:
+            structures: Directory containing the downloaded structure files.
         Returns:
             DataFrame with columns [Sequence_ID_1, Sequence_ID_2, score].
         """
         logger.info("Computing pairwise similarity scores with %s...", self.config.tool.value)
         foldseek_score = self.config.foldseek_score or "evalue"
         computer = StructSimComputer(foldseek_score=foldseek_score)
-        scores = computer.run(self.config.tool, self.config.structures_dir)
+        scores = computer.run(self.config.tool, structures)
         return scores
 
     def generate_clans_file(
@@ -207,6 +209,6 @@ class ClansPipeline:
         """
         uids_with_regions = self.fetch_structures()
         cleaned_fasta_path = self.generate_cleaned_fasta(uids_with_regions)
-        scores = self.compute_scores()
+        scores = self.compute_scores(self.config.structures_dir)
         clans_file_path = self.generate_clans_file(scores, cleaned_fasta_path)
         return clans_file_path, cleaned_fasta_path

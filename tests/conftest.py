@@ -26,6 +26,16 @@ def small_clans_path():
 
 
 @pytest.fixture
+def small_cif_path():
+    return os.path.join(FIXTURES_DIR, "small.cif")
+
+
+@pytest.fixture
+def small_tsv_path():
+    return os.path.join(FIXTURES_DIR, "small.tsv")
+
+
+@pytest.fixture
 def small_scores_df():
     """A minimal pairwise scores DataFrame with 3 sequences."""
     return pd.DataFrame(

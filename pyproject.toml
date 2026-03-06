@@ -36,8 +36,38 @@ dev = [
 [project.scripts]
 clans3d = "clans3d.main:main"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "e2e: end-to-end tests requiring Foldseek and/or USalign in PATH (deselect with '-m not e2e')",
+    "integration: integration tests using real fixture files but no external binaries",
+    "regression: regression tests that compare output against stored baselines",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
 "clans3d.legacy" = ["*.jar"]
+
+[tool.coverage.run]
+source = ["clans3d"]
+omit = [
+    "tests/*",
+    "src/clans3d/legacy/*", # Exclude legacy JAR wrappers
+    "src/clans3d/benchmark/*", # Exclude benchmarking scripts
+    "src/clans3d/dataset_generator/*" # Exclude dataset generator
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "@(abc\\.)?abstractmethod",
+]

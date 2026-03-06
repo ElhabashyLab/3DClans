@@ -1,7 +1,9 @@
+import logging
 import requests
 import time
 from typing import Iterable
 
+logger = logging.getLogger(__name__)
 
 def _chunked(iterable: list[str], size: int) -> Iterable[list[str]]:
     """
@@ -98,8 +100,7 @@ def uniprot_accessions_to_uniparc_accessions(
     """
     Convert UniProt accessions to UniParc accessions using the UniProt
     ID mapping service.
-
-    Uses batching and returns None for accessions that were not mapped
+    Uses batching and returns None for accessions that were not mapped.
 
     Args:
         uniprot_accessions (list[str]): UniProt accessions to convert.
@@ -108,6 +109,7 @@ def uniprot_accessions_to_uniparc_accessions(
     Returns:
         dict[str, str | None]: Mapping {uniprot_accession: uniparc_accession | None}.
     """
+    logger.debug("Converting %d UniProt accessions to UniParc accessions with batch size %d...", len(uniprot_accessions), batch_size)
     UNIPROT_IDMAPPING_RUN_URL = "https://rest.uniprot.org/idmapping/run"
     UNIPROT_IDMAPPING_RESULTS_URL = "https://rest.uniprot.org/idmapping/results/{}"
     final_mapping: dict[str, str | None] = {}

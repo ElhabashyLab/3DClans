@@ -102,6 +102,7 @@ class ClansFileGenerator:
         """
         param_block = self._extract_block("param", lines)
         if param_block is None:
+            # can return None because parameters are not required
             return None
         params = {}
         for line in param_block:

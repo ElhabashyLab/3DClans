@@ -18,6 +18,59 @@ def _log_interval(total: int) -> int:
     return max(1, min(10, total // 5))
 
 
+def _parse_region_from_tsv_row(row: pd.Series) -> tuple[int, int] | None:
+    """
+    Parses and validates the region columns from a TSV row.
+
+    Returns:
+        tuple[int, int]: (start, end) if both are present and valid.
+        None: if both are absent (deliberately no region specified).
+
+    Raises:
+        ValueError: if only one of start/end is present, or if the range is biologically invalid.
+    """
+    start = row.get('region_start', pd.NA)
+    end = row.get('region_end', pd.NA)
+    start_missing = pd.isna(start)
+    end_missing = pd.isna(end)
+    if start_missing and end_missing:
+        return None
+    if start_missing or end_missing:
+        raise ValueError("only one of region_start/region_end is specified")
+    start, end = int(start), int(end)
+    if start < 1 or end < 1 or end < start:
+        raise ValueError(f"invalid region (start={start}, end={end})")
+    return (start, end)
+
+
+def _fetch_alphafold_cif_url(accession_id: str) -> str | None:
+    """
+    Queries the AlphaFold DB REST API and returns the CIF download URL for the
+    given accession, or None if the request fails or no URL is found.
+
+    Args:
+        accession_id (str): UniProt accession to look up.
+
+    Returns:
+        str | None: CIF download URL, or None on failure.
+    """
+    api_url = f"https://alphafold.ebi.ac.uk/api/prediction/{accession_id}"
+    try:
+        response = requests.get(api_url, timeout=30)
+        response.raise_for_status()
+        predictions = response.json()
+    except requests.RequestException as e:
+        logger.debug("Failed to reach AlphaFold API for %s: %s", accession_id, e)
+        return None
+    if not predictions:
+        logger.debug("No predictions found in AlphaFold API response for %s.", accession_id)
+        return None
+    url = predictions[0].get("cifUrl")
+    if not url:
+        logger.debug("No cifUrl in AlphaFold API response for %s.", accession_id)
+    return url
+
+
 def fetch_structures(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict[str, tuple[int, int] | None]:
     """
     Fetches and stores structure files, specified in a given input_file in a output directory.
@@ -60,11 +113,19 @@ def process_fasta_file(input_file_path: str, output_dir: str) -> dict:
     total_records = len(records)
     interval = _log_interval(total_records)
     for idx, record in enumerate(records, 1):
-        uid = extract_uid_from_recordID(record.id)
-        region = extract_region_from_record(record)
+        try:
+            uid = extract_uid_from_recordID(record.id)
+            region = extract_region_from_record(record)
+        except ValueError as e:
+            logger.warning("Skipping entry '%s': %s", record.id, e)
+            if idx % interval == 0 or idx == total_records:
+                logger.info("Downloaded %d/%d structures...", idx, total_records)
+            continue
         if download_alphafold_structure(uid, output_dir, region):
             uids_with_regions[uid] = region
             successful_downloads += 1
+        else:
+            logger.warning("Skipping entry '%s': could not download AlphaFold structure.", uid)
         if idx % interval == 0 or idx == total_records:
             logger.info("Downloaded %d/%d structures...", idx, total_records)
     failed = total_records - successful_downloads
@@ -92,15 +153,16 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
     interval = _log_interval(total_uids)
     for idx, (_, row) in enumerate(df.iterrows(), 1):
         uid = row['entry']
-        start: int = row['region_start']
-        end: int = row['region_end']
-        if pd.isna(start) or pd.isna(end):
-            region = None
-        else:
-            region = (int(start), int(end))
+        try:
+            region = _parse_region_from_tsv_row(row)
+        except ValueError as e:
+            logger.warning("Skipping entry '%s': %s", uid, e)
+            continue
         if download_alphafold_structure(uid, output_dir, region):
             successful_downloads += 1
             uids_with_regions[uid] = region
+        else:
+            logger.warning("Skipping entry '%s': could not download AlphaFold structure.", uid)
         if idx % interval == 0 or idx == total_uids:
             logger.info("Downloaded %d/%d structures...", idx, total_uids)
     failed = total_uids - successful_downloads
@@ -109,78 +171,49 @@ def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
 
 
 def download_alphafold_structure(
-    id: str,
+    accession_id: str,
     output_dir: str,
     region: tuple[int, int] | None,
-    file_format: str = "cif",
 ) -> bool:
     """
-    Downloads the AlphaFold-predicted structure for a given structure-ID (f.e. Uniprot-ID) and saves it
-    to the specified output directory. If a residue region is provided, the structure
-    is truncated to that region after download.
-    The structure URL is obtained via the official AlphaFold DB REST API.
+    Downloads the AlphaFold-predicted CIF structure for a given accession and saves
+    it to the output directory. If a region is provided, the structure is trimmed to
+    that residue range after download.
 
     Args:
-        id (str): accession-id of the structure.
+        accession_id (str): UniProt accession of the structure to download.
         output_dir (str): Directory where the structure file will be saved.
-        region (tuple[int, int] | None): Residue range [start, end] to extract (1-based, inclusive).
-        file_format (str): Structure format to download ("pdb" or "cif"). Defaults to "cif".
+        region (tuple[int, int] | None): Residue range (start, end) to extract
+            (1-based, inclusive). Pass None to keep the full structure.
 
     Returns:
-        bool: True if the structure was successfully downloaded (and processed),
+        bool: True if the structure was successfully downloaded (and trimmed),
               False otherwise.
     """
-    logger.debug("Downloading structure for ID: %s with region: %s", id, region)
-    if file_format not in {"pdb", "cif"}:
-        raise ValueError("file_format must be 'pdb' or 'cif'")
-    
-    api_url = f"https://alphafold.ebi.ac.uk/api/prediction/{id}"
-    try:
-        response = requests.get(api_url, timeout=30)
-        response.raise_for_status()
-        predictions = response.json()
-    except Exception:
-        logger.warning("Failed to download %s from %s", id, api_url)
+    logger.debug("Downloading structure for %s with region: %s", accession_id, region)
+    cif_url = _fetch_alphafold_cif_url(accession_id)
+    if not cif_url:
         return False
-    if not predictions:
-        logger.warning("Failed to download %s from %s", id, api_url)
+    save_path = os.path.join(output_dir, f"{accession_id}.cif")
+    if not download_file(cif_url, save_path):
         return False
-    
-    model_info = predictions[0]
-    if file_format == "pdb":
-        structure_url = model_info.get("pdbUrl")
-    else:
-        structure_url = model_info.get("cifUrl")
-    if not structure_url:
-        logger.warning("Failed to download %s from %s", id, api_url)
-        return False
-
-    path_to_structure = os.path.join(output_dir, f"{id}.{file_format}")
-    success = download_file(structure_url, path_to_structure)
-    if not success:
-        logger.warning("Failed to download %s from %s", id, api_url)
-        return False
-
     if region:
-        extract_region_of_protein(
-            path_to_structure,
-            file_format,
-            region,
-            path_to_structure,
-        )
+        extract_region_of_protein(save_path, region, save_path)
     return True
     
 
-def extract_region_of_protein(path_to_protein: str, file_type: str, region: tuple[int, int], output_path = None):
+def extract_region_of_protein(path_to_protein: str, region: tuple[int, int], output_path: str | None = None) -> str:
     """
-    Extracts a specific residue range from a protein structure file (PDB or CIF)
-    and writes the filtered structure to a new file.
-    
+    Extracts a specific residue range from a CIF structure file and writes the
+    filtered structure to a file.
+
     Args:
-        path_to_protein (str): Path to the protein structure file.
-        file_type (str): 'pdb' or 'cif'.
+        path_to_protein (str): Path to the input CIF structure file.
         region (tuple[int, int]): (start, end) residue indices to extract (1-based, inclusive).
-        output_path (str, optional): Path to save extracted structure. Defaults to adding '_roi' suffix.
+        output_path (str, optional): Destination path. Defaults to the input path with a '_roi' suffix.
+
+    Returns:
+        str: Path to the written output file.
     """
     logger.debug("Extracting region %s from protein file: %s", region, path_to_protein)
     class SelectRegion(Select):

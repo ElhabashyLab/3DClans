@@ -11,6 +11,11 @@ from clans3d.utils.api_utils import uniprot_accessions_to_uniparc_accessions
 
 logger = logging.getLogger(__name__)
 
+# Matches the official UniProt accession format:
+# https://www.uniprot.org/help/accession_numbers
+_UNIPROT_ACCESSION_RE = re.compile(
+    r"[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2}"
+)
 
 def extract_records_from_fasta(fasta_file):
     """
@@ -65,27 +70,33 @@ def clean_fasta_file(fasta_file: str, uids: list[str], out_path: str) -> str:
 
 def extract_uid_from_recordID(record_id):
     """
-    Extracts the UniProt ID from a record ID.
-    It removes any version numbers and prefixes.
-    Assumes the record ID is in the format 'tr|A0A2M8UWB6.1|A0A2M8UWB6_PSESP/524-595'.
-    :param record_id: the record ID string
-    :return: the extracted UniProt ID
+    Extracts the UniProt accession from a record ID by searching for the
+    standard UniProt accession pattern directly in the string.
+
+    Handles formats such as:
+        sp|P49811|MYOD1_PIG, tr|A0A2M8UWB6.1|A0A2M8UWB6_PSESP/524-595,
+        P49811, P49811.1, P49811/1-300
+
+    Falls back to stripping any version suffix (e.g. ``P49811.1`` → ``P49811``)
+    or splitting on ``_`` (gene name style, e.g. ``MYOD1_PIG`` → ``MYOD1``) when
+    no accession pattern is found.
+
+    Args:
+        record_id (str): the record ID string
+    Returns:
+        str: the extracted UniProt ID
     """
-    if "|" in record_id:
-        uid = record_id.split("|")[1].split(".")[0]
-    elif "_" in record_id:
-        uid = record_id.split("_")[0].split(".")[0]
-    elif "/" in record_id:
-        uid = record_id.split("/")[0].split(".")[0]
+    match = _UNIPROT_ACCESSION_RE.search(record_id)
+    if match:
+        return match.group()
     else:
-        # if no '|' is found in header, the header is assumed to be the uid
-        uid = record_id.split(".")[0]
-    return uid
+        raise ValueError(f"Could not extract UniProt accession from record ID: {record_id}")
 
 
 def extract_region_from_record(record) -> tuple[int, int] | None:
     """
     Extracts the numeric region of interest (start and end) from a FASTA record header.
+    If the region is invalid, it raises a ValueError.
 
     Example header:
         >Y1502_ARCFU/1-68
@@ -106,9 +117,12 @@ def extract_region_from_record(record) -> tuple[int, int] | None:
     match = re.search(r"/(\d+)-(\d+)", header)
     if match:
         start, end = map(int, match.groups())
-        return (start, end)
+        if start < 1 or end < 1 or end < start:
+            raise ValueError(f"Invalid region {start}-{end} in record ID: {header}")
+        region = (start, end)
     else:
-        return None
+        region = None
+    return region
 
 
 def add_region_to_record(record: SeqRecord, region: tuple[int, int] | None) -> SeqRecord:
@@ -181,37 +195,36 @@ def copy_records_from_fasta(path_to_fasta: str, uids: list[str], out_path: str) 
     return out_path
 
 
-def download_fasta_record(uid: str, upi=None, region: tuple[int, int] | None = None) -> SeqRecord | bool:
+def download_fasta_record(uid: str, upi: str | None = None, region: tuple[int, int] | None = None) -> SeqRecord:
     """
-    Download a FASTA record by accession from Uniprot and as a fallback from UniParc.
-    If the record is downloaded from UniParc the initial uid is used as accession-id.
-    If the sequence is not found, it returns False.
-    If a region is provided, the sequence is truncated to that region and the record ID is modified accordingly.   
+    Download a FASTA record by accession from UniProt, falling back to UniParc if not found.
+    A region can optionally be specified to extract a subsequence from the full sequence.
 
     Args:
         uid (str): UniProt accession.
-        upi (str, optional): UniParc accession. Defaults to None.
-        region (tuple[int, int] | None): Residue range [start, end]
+        upi (str | None): UniParc accession used as fallback. Defaults to None.
+        region (tuple[int, int] | None): Residue range [start, end].
     Returns:
-        SeqRecord: downloaded FASTA record.
-        bool: False if download failed.
+        SeqRecord: The downloaded FASTA record.
+    Raises:
+        requests.exceptions.RequestException: On network or transport failure.
+        ValueError: If the sequence is not found on either endpoint.
     """
-    logger.debug("Attempting to download FASTA record for UID: %s with UPI: %s and region: %s", uid, upi, region)
-    uniprot_api_url = f"https://rest.uniprot.org/uniprotkb/{uid}.fasta"
-    uniparc_api_url = f"https://rest.uniprot.org/uniparc/{upi}.fasta"
-    urls = [uniprot_api_url, uniparc_api_url if upi is not None else uniprot_api_url]
-    for url in urls:
-        try:
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200 and response.text.startswith(">"):
-                fasta_io = StringIO(response.text)
-                record = next(SeqIO.parse(fasta_io, "fasta"))
-                if region:
-                    record = add_region_to_record(record, region)
-                return record
-        except Exception as e:
-            continue
-    return False
+    logger.debug("Downloading FASTA record for UID: %s with UPI: %s and region: %s", uid, upi, region)
+
+    response = requests.get(f"https://rest.uniprot.org/uniprotkb/{uid}.fasta", timeout=10)
+    if not (response.status_code == 200 and response.text.startswith(">")):
+        if upi is None:
+            raise ValueError(f"Sequence not found for UID: {uid}")
+        logger.debug("UID %s not found in UniProt, trying UniParc (%s)", uid, upi)
+        response = requests.get(f"https://rest.uniprot.org/uniparc/{upi}.fasta", timeout=10)
+        if not (response.status_code == 200 and response.text.startswith(">")):
+            raise ValueError(f"Sequence not found for UID: {uid} (UniParc: {upi})")
+
+    record = next(SeqIO.parse(StringIO(response.text), "fasta"))
+    if region:
+        record = add_region_to_record(record, region)
+    return record
 
 
 def remove_non_existing_uniprot_accessions(uniprot_accessions: list[str]) -> list[str]:
@@ -226,9 +239,10 @@ def remove_non_existing_uniprot_accessions(uniprot_accessions: list[str]) -> lis
     """
     uids_to_upis = uniprot_accessions_to_uniparc_accessions(uniprot_accessions)
     for uid, upi in uids_to_upis.items():
-        record = download_fasta_record(uid, upi=upi)
-        if record is False:
-            logger.warning("Could not retrieve sequence for UID: %s", uid)
+        try:
+            download_fasta_record(uid, upi=upi)
+        except (ValueError, requests.exceptions.RequestException) as e:
+            logger.warning("Could not retrieve sequence for UID %s: %s — skipping", uid, e)
             uniprot_accessions.remove(uid)
     return uniprot_accessions
 
@@ -265,7 +279,7 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict[str, tuple[int
     Generates a FASTA file containing the sequences (cut down to their corresponding regions) of the given UIDs.
     The records will include the UID and region (if present) in the header.
     
-    If original_fasta is provided, the method will copy sequences which are also part of the uids_with_regions.
+    If original_fasta is provided, the method will copy only sequences which are also part of the uids_with_regions.
     Otherwise the fasta file is generated from scratch and the Record IDs are of the format: UID or UID/start-end.
     The sequences are cut to the specified regions if provided.
 
@@ -274,6 +288,7 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict[str, tuple[int
         out_path (str): Path to the output FASTA file.
         original_fasta (str, optional): Path to an existing FASTA file with sequences.
     Returns:
+        str: Path to the output FASTA file.
     """
     logger.debug("Generating FASTA from UIDs with regions...")
     uids = list(uids_with_regions.keys())
@@ -286,12 +301,12 @@ def generate_fasta_from_uids_with_regions(uids_with_regions: dict[str, tuple[int
         uids_to_upis = uniprot_accessions_to_uniparc_accessions(uids)
         for uid, region in uids_with_regions.items():
             upi = uids_to_upis.get(uid)
-            downloaded_record_with_region = download_fasta_record(uid, upi, region)
-            if isinstance(downloaded_record_with_region, SeqRecord):
-                downloaded_record_with_region.id = uid
-                records.append(downloaded_record_with_region)
-            else:
-                fallback_record = create_mock_up_record(uid, region)
-                records.append(fallback_record)
+            try:
+                record = download_fasta_record(uid, upi, region)
+                record.id = uid
+                records.append(record)
+            except (ValueError, requests.exceptions.RequestException) as e:
+                logger.warning("Could not download %s: %s — using mock-up", uid, e)
+                records.append(create_mock_up_record(uid, region))
         SeqIO.write(records, out_path, "fasta")
     return out_path

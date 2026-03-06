@@ -153,7 +153,7 @@ class Benchmark:
         try:
             # Score Computation
             start = time.perf_counter()
-            scores = pipeline.compute_scores()
+            scores = pipeline.compute_scores(pipeline.config.structures_dir)
             score_computation_time = time.perf_counter() - start
             print(f"Computed scores for {len(scores)} pairs in {score_computation_time:.2f}s")
             
