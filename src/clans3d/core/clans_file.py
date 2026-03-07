@@ -136,7 +136,7 @@ class ClansFile:
         for coord in self.coordinates:
             # Convert UID back to index for CLANS file format
             uid = coord[0]
-            idx = self._uid_to_index.get(uid, uid)  # Fallback to uid if not found (for backwards compat)
+            idx = self._uid_to_index.get(uid)
             content.append(f"{idx} {coord[1]} {coord[2]} {coord[3]}")
         content.append("</pos>")
         return content
@@ -148,8 +148,8 @@ class ClansFile:
             # Convert UIDs back to indices for CLANS file format
             uid1 = row['Sequence_ID_1']
             uid2 = row['Sequence_ID_2']
-            idx1 = self._uid_to_index.get(uid1, uid1)  # Fallback for backwards compat
-            idx2 = self._uid_to_index.get(uid2, uid2)
+            idx1 = self._uid_to_index.get(uid1)
+            idx2 = self._uid_to_index.get(uid2)
             content.append(f"{idx1} {idx2}:{row['score']}")
         content.append("</hsp>")
         return content

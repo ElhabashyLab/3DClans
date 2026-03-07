@@ -20,12 +20,13 @@ class USalign(StructSimTool):
         super().__init__("USalign", description, working_dir)
         self.flag_dir = "-dir" # specifies the directory containing structure files
         self.flag_outfmt = "-outfmt" # specifies the output format
-        self.outfmt = "2"
+        self.flag_outfmt = "2" # output format 2 is tab-separated with columns: PDBchain1, PDBchain2, TM1, TM2, ...
         
         
     def start_run(self, structures_dir: str, expected_number_of_scores: int) -> pd.DataFrame:
         """
         Initializes the self.command list with the necessary parameters to run the tool and then returns _execute_run with the specified structures_dir.
+        Returns the computed similarity scores as a DataFrame.
         
         Args:
             structures_dir (str): The directory containing the structure files to be compared.
@@ -42,7 +43,7 @@ class USalign(StructSimTool):
             for structure_name in structure_files:
                 f.write(f"{structure_name}\n")
         # example command: "USalign -dir structures_dir/ structure_names.txt -outfmt 2"
-        self.command = [self.name, self.flag_dir, structures_dir + "/", structure_names_list, self.flag_outfmt, self.outfmt]
+        self.command = [self.name, self.flag_dir, structures_dir + "/", structure_names_list, self.flag_outfmt, self.flag_outfmt]
         return self._execute_run(expected_number_of_scores)
 
     
@@ -88,25 +89,28 @@ class USalign(StructSimTool):
     def _parse_output(self) -> pd.DataFrame:
         """
         Parses the output of the tool to extract the similarity scores.
+
+        Raises:
+            RuntimeError: If the output cannot be parsed or is empty.
         """
         try:
             df = pd.read_csv(StringIO(self.output), sep='\t')
-            if not df.empty:
-                df.columns = [col.lstrip('#') for col in df.columns]
-                df1 = df[['PDBchain1', 'PDBchain2', 'TM1', 'TM2']].copy()
-                # take the maximum of TM1 and TM2
-                df1['TM'] = df1[['TM1', 'TM2']].max(axis=1)
-                df1["score"] = 1 - df1["TM"]  # transform TM-score to distance metric
-                df2 = df1.drop(columns=['TM1', 'TM2'])
-                # clean structure names (remove file extensions)
-                df2['PDBchain1'] = df2['PDBchain1'].str.split(".").str[0]
-                df2['PDBchain2'] = df2['PDBchain2'].str.split(".").str[0]
-                # rename columns to standard naming
-                df2 = df2.rename(columns={'PDBchain1': 'Sequence_ID_1', 'PDBchain2': 'Sequence_ID_2'})
-                return df2
-            else:
-                logger.error("Failed to parse output: DataFrame is empty.")
-                return pd.DataFrame()  # Return an empty DataFrame if the output is empty
+            if df.empty:
+                raise RuntimeError(f"{self.name} produced empty output.")
+            df.columns = [col.lstrip('#') for col in df.columns]
+            df1 = df[['PDBchain1', 'PDBchain2', 'TM1', 'TM2']].copy()
+            # take the maximum of TM1 and TM2
+            df1['TM'] = df1[['TM1', 'TM2']].max(axis=1)
+            # transform TM-score to distance metric
+            df1["score"] = 1 - df1["TM"]
+            df2 = df1.drop(columns=['TM1', 'TM2'])
+            # clean structure names (remove file extensions)
+            df2['PDBchain1'] = df2['PDBchain1'].str.split(".").str[0]
+            df2['PDBchain2'] = df2['PDBchain2'].str.split(".").str[0]
+            # rename columns to generic naming
+            df2 = df2.rename(columns={'PDBchain1': 'Sequence_ID_1', 'PDBchain2': 'Sequence_ID_2'})
+            return df2
+        except RuntimeError:
+            raise
         except Exception as e:
-            logger.error("Error parsing output: %s", e)
-            return pd.DataFrame()  # Return an empty DataFrame on parsing error
+            raise RuntimeError(f"{self.name} failed to parse output: {e}") from e

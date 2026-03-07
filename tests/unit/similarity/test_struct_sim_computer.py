@@ -76,3 +76,19 @@ class TestRun:
             mock_factory.return_value = mock_tool
             result = computer.run(ToolType.FOLDSEEK, str(struct_dir))
         assert len(result) == 1
+
+    def test_raises_when_tool_raises(self, tmp_path):
+        """RuntimeError from start_run must propagate out of run() unchanged."""
+        struct_dir = tmp_path / "structures"
+        struct_dir.mkdir()
+        (struct_dir / "P1.cif").write_text("")
+        (struct_dir / "P2.cif").write_text("")
+
+        computer = StructSimComputer()
+        with patch.object(computer, "_create_tool") as mock_factory:
+            mock_tool = MagicMock()
+            mock_tool.name = "MockTool"
+            mock_tool.start_run.side_effect = RuntimeError("tool crashed")
+            mock_factory.return_value = mock_tool
+            with pytest.raises(RuntimeError, match="tool crashed"):
+                computer.run(ToolType.FOLDSEEK, str(struct_dir))

@@ -1,6 +1,6 @@
 import logging
 import os
-
+from pandas import DataFrame
 from clans3d.similarity.usalign import USalign
 from clans3d.similarity.foldseek import Foldseek
 from clans3d.similarity.tool_type import ToolType
@@ -21,7 +21,7 @@ class StructSimComputer:
         self.results = {}    
 
 
-    def run(self, tool_type: ToolType, structures_dir: str):
+    def run(self, tool_type: ToolType, structures_dir: str) -> DataFrame:
         """
         Run the specified tool on the structures directory.
         """

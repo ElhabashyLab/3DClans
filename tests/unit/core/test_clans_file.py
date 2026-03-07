@@ -116,3 +116,19 @@ class TestClansFileStr:
     def test_fasta_sequences_present(self):
         assert "ACDE" in self.content
         assert "FGHI" in self.content
+
+    def test_parameters_written_with_dash_prefix(self):
+        cf = ClansFile(3, _make_coords(), _make_scores(), fasta_records=_make_records(),
+                       parameters={"pval": "1e-5", "maxmove": "0.1"})
+        content = str(cf)
+        assert "-pval 1e-5" in content
+        assert "-maxmove 0.1" in content
+
+    def test_empty_scores_produces_empty_hsp_block(self):
+        empty = pd.DataFrame(columns=["Sequence_ID_1", "Sequence_ID_2", "score"])
+        cf = ClansFile(3, _make_coords(), empty, fasta_records=_make_records())
+        content = str(cf)
+        assert "<hsp>" in content
+        assert "</hsp>" in content
+        between = content.split("<hsp>")[1].split("</hsp>")[0].strip()
+        assert between == ""

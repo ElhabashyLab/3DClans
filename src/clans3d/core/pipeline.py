@@ -120,14 +120,23 @@ class ClansPipeline:
 
         Returns:
             dict mapping UID to optional (region_start, region_end).
+
+        Raises:
+            RuntimeError: If no structures could be downloaded.
         """
         logger.info("Fetching structures from AlphaFold...")
         os.makedirs(self.config.structures_dir, exist_ok=True)
-        return fetch_structures(
+        uids_with_regions = fetch_structures(
             self.config.input_file,
             self.config.input_type,
             self.config.structures_dir,
         )
+        if not uids_with_regions:
+            raise RuntimeError(
+                "No structures could be downloaded. "
+                "Check your input file and network access."
+            )
+        return uids_with_regions
 
     def generate_cleaned_fasta(
         self, uids_with_regions: dict[str, tuple[int, int] | None]
@@ -164,7 +173,7 @@ class ClansPipeline:
         Returns:
             DataFrame with columns [Sequence_ID_1, Sequence_ID_2, score].
         """
-        logger.info("Computing pairwise similarity scores with %s...", self.config.tool.value)
+        logger.info(f"Computing pairwise similarity scores with {self.config.tool.value}...")
         foldseek_score = self.config.foldseek_score or "evalue"
         computer = StructSimComputer(foldseek_score=foldseek_score)
         scores = computer.run(self.config.tool, structures)

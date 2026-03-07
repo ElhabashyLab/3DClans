@@ -1,9 +1,13 @@
+import logging
+import sys
 from clans3d.similarity.tool_type import ToolType
 from clans3d.core.input_file_type import InputFileType
 from clans3d.core.cli import parse_args
 from clans3d.core.pipeline import ClansPipeline, PipelineConfig
 from clans3d.utils.dependency_checks import verify_tool_dependencies
 from clans3d.utils.log import setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -22,7 +26,11 @@ def main():
         quiet=args.quiet,
     )
     pipeline = ClansPipeline(config)
-    clans_file_path, cleaned_input_file_path = pipeline.run()
+    try:
+        clans_file_path, cleaned_input_file_path = pipeline.run()
+    except (RuntimeError, FileNotFoundError, ValueError) as e:
+        logger.error("%s", e)
+        sys.exit(1)
 
     print(f"CLANS file: {clans_file_path}")
     return clans_file_path, cleaned_input_file_path

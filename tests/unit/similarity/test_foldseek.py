@@ -1,6 +1,8 @@
 """Unit tests for clans3d.similarity.foldseek.Foldseek."""
+import subprocess
 import pytest
 import pandas as pd
+from unittest.mock import patch
 from clans3d.similarity.foldseek import Foldseek
 
 
@@ -20,10 +22,10 @@ def foldseek_tm():
 
 class TestGetOutputColumns:
     def test_evalue_columns(self, foldseek_evalue):
-        assert foldseek_evalue.output_columns == "query,target,evalue"
+        assert foldseek_evalue.arg_output_columns == "query,target,evalue"
 
     def test_tm_columns(self, foldseek_tm):
-        assert foldseek_tm.output_columns == "query,target,qtmscore,ttmscore"
+        assert foldseek_tm.arg_output_columns == "query,target,qtmscore,ttmscore"
 
     def test_invalid_score_raises(self):
         with pytest.raises(ValueError):
@@ -132,3 +134,64 @@ class TestDetectPhase:
         reader = {"chunks": ["counting k-mers step", "convertalis running"]}
         phase = foldseek_evalue._detect_phase(reader)
         assert phase == "Converting results ..."
+
+
+# ---------------------------------------------------------------------------
+# _create_database
+# ---------------------------------------------------------------------------
+
+class TestCreateDatabase:
+    def test_raises_runtime_error_on_subprocess_failure(self, foldseek_evalue, tmp_path):
+        foldseek_evalue.working_dir = str(tmp_path)
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(1, "foldseek", stderr="db error")
+            with pytest.raises(RuntimeError, match="createdb failed"):
+                foldseek_evalue._create_database(str(tmp_path / "structures"), "testDB")
+
+    def test_returns_correct_db_path_on_success(self, foldseek_evalue, tmp_path):
+        foldseek_evalue.working_dir = str(tmp_path)
+        with patch("subprocess.run"):
+            result = foldseek_evalue._create_database(str(tmp_path / "structures"), "testDB")
+        assert result == str(tmp_path / "testDB")
+
+
+# ---------------------------------------------------------------------------
+# _parse_output
+# ---------------------------------------------------------------------------
+
+class TestParseOutputEvalue:
+    def test_raises_on_convertalis_subprocess_failure(self, foldseek_evalue, tmp_path):
+        foldseek_evalue.working_dir = str(tmp_path)
+        foldseek_evalue.db = str(tmp_path / "db")
+        foldseek_evalue.alignmentDb = str(tmp_path / "aln")
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(1, "foldseek", stderr="conv error")
+            with pytest.raises(RuntimeError, match="convertalis failed"):
+                foldseek_evalue._parse_output()
+
+    def test_parses_evalue_output_correctly(self, foldseek_evalue, tmp_path):
+        foldseek_evalue.working_dir = str(tmp_path)
+        foldseek_evalue.db = str(tmp_path / "db")
+        foldseek_evalue.alignmentDb = str(tmp_path / "aln")
+        # pandas uses row 0 as the column header, so write a dummy header row
+        # followed by one real data row (matches real foldseek convertalis output)
+        (tmp_path / "alignmentFile").write_text("A\tB\t1e-5\nC\tD\t1e-10\n")
+        with patch("subprocess.run"):
+            result = foldseek_evalue._parse_output()
+        assert list(result.columns) == ["Sequence_ID_1", "Sequence_ID_2", "score"]
+        assert result["score"].iloc[0] == pytest.approx(1e-10)
+
+
+class TestParseOutputTM:
+    def test_parses_tm_output_correctly(self, foldseek_tm, tmp_path):
+        foldseek_tm.working_dir = str(tmp_path)
+        foldseek_tm.db = str(tmp_path / "db")
+        foldseek_tm.alignmentDb = str(tmp_path / "aln")
+        # pandas uses row 0 as the column header; row 1 is the actual data
+        (tmp_path / "alignmentFile").write_text("A\tB\t0.5\t0.6\nC\tD\t0.7\t0.9\n")
+        with patch("subprocess.run"):
+            result = foldseek_tm._parse_output()
+        # max(0.7, 0.9) = 0.9 → score = 1 - 0.9 = 0.1
+        assert result["score"].iloc[0] == pytest.approx(0.1)
+        assert "TM1" not in result.columns
+        assert "TM2" not in result.columns

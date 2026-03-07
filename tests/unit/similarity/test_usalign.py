@@ -63,7 +63,20 @@ class TestParseOutput:
         result = usalign._parse_output()
         assert len(result) == 3
 
-    def test_empty_output_returns_empty_dataframe(self, usalign):
+    def test_empty_output_raises(self, usalign):
         usalign.output = ""
+        with pytest.raises(RuntimeError):
+            usalign._parse_output()
+
+    def test_tm_column_not_in_final_output(self, usalign):
+        """Raw TM1/TM2 columns should be dropped; the intermediate TM column remains for reference."""
+        usalign.output = USALIGN_OUTPUT
         result = usalign._parse_output()
-        assert result.empty
+        assert "TM1" not in result.columns
+        assert "TM2" not in result.columns
+
+    def test_raises_on_malformed_output(self, usalign):
+        """Non-TSV / completely garbled output should raise RuntimeError."""
+        usalign.output = "this is not\tvalid usalign\noutput at all"
+        with pytest.raises(RuntimeError):
+            usalign._parse_output()

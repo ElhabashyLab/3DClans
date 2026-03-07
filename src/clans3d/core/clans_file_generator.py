@@ -108,7 +108,7 @@ class ClansFileGenerator:
         for line in param_block:
             if not line:
                 continue
-            key, value = line.split("=")
+            key, value = line.split("=", 1)
             params[key.strip()] = value.strip()
         return params
     
@@ -170,6 +170,8 @@ class ClansFileGenerator:
             id1, id2 = left.split()
             score = right
             scores_data.append({"Sequence_ID_1": int(id1), "Sequence_ID_2": int(id2), "score": float(score)})
+        if not scores_data:
+            return pd.DataFrame(columns=["Sequence_ID_1", "Sequence_ID_2", "score"])
         scores_df = pd.DataFrame(scores_data)
         return scores_df
     
@@ -186,10 +188,10 @@ class ClansFileGenerator:
             The path to the generated CLANS file.
         """
         uids = extract_uids_from_fasta(path_to_fasta)
-        scores = self._normalize_scores_format(scores, uids)
-        self.length_of_fasta = len(uids)
+        scores = self._normalize_scores_format(scores)
+        self.number_of_sequences = len(uids)
         clans_file = ClansFile(
-            self.length_of_fasta,
+            self.number_of_sequences,
             self._generate_random_coordinates(uids),
             scores,
             path_to_fasta=path_to_fasta,
@@ -202,7 +204,7 @@ class ClansFileGenerator:
         return out_path
 
 
-    def _normalize_scores_format(self, scores: DataFrame, uids: list[str]) -> DataFrame:
+    def _normalize_scores_format(self, scores: DataFrame) -> DataFrame:
         """
         Normalize pairwise similarity scores format:
         1. Ensures consistent ordering of pairs (uid1 < uid2 alphabetically for deduplication)
@@ -212,7 +214,6 @@ class ClansFileGenerator:
         Args:
             scores: A pandas DataFrame containing the pairwise similarity scores with columns
                     [Sequence_ID_1, Sequence_ID_2, score] where Sequence_ID_1/2 are UIDs.
-            uids: A list of UIDs in the order they appear in the input fasta file.
         Returns:
             A pandas DataFrame containing the normalized pairwise similarity scores with UIDs.
         """

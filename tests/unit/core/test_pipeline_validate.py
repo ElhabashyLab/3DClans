@@ -1,4 +1,4 @@
-"""Unit tests for clans3d.core.pipeline.ClansPipeline._validate and PipelineConfig defaults."""
+"""Unit tests for clans3d.core.pipeline.ClansPipeline._validate, PipelineConfig defaults, and fetch_structures."""
 import os
 import pytest
 from unittest.mock import patch
@@ -76,3 +76,28 @@ class TestClansPipelineValidate:
         )
         pipeline = ClansPipeline(config)  # should not raise
         assert pipeline is not None
+
+
+class TestFetchStructures:
+    @pytest.fixture
+    def pipeline(self, fasta_path):
+        config = PipelineConfig(
+            input_file=fasta_path,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+        )
+        return ClansPipeline(config)
+
+    def test_raises_when_no_structures_downloaded(self, pipeline):
+        """Empty dict from structure_utils must abort with RuntimeError."""
+        with patch("clans3d.core.pipeline.fetch_structures", return_value={}):
+            with pytest.raises(RuntimeError, match="No structures"):
+                pipeline.fetch_structures()
+
+    def test_returns_uid_dict_on_partial_success(self, pipeline):
+        """A non-empty dict is returned unchanged — partial failures are fine."""
+        expected = {"P11111": None, "P22222": (1, 100)}
+        with patch("clans3d.core.pipeline.fetch_structures", return_value=expected), \
+             patch("os.makedirs"):
+            result = pipeline.fetch_structures()
+        assert result == expected

@@ -23,7 +23,6 @@ class StructSimTool():
         self.working_dir = working_dir
         self.command = []
         self.output = None
-        self.expected_number_of_scores = 0
         
         
     def start_run(self, structures_dir: str, expected_number_of_scores: int) -> pd.DataFrame:
@@ -42,12 +41,13 @@ class StructSimTool():
         
         Args:
             expected_number_of_scores: The expected number of pairwise
-                scores.  Stored on the instance and available to
-                :meth:`_log_progress` for percentage calculation.
+                scores.  Stored on the instance and available to :meth:`_log_progress` for percentage calculation.
         
         Returns:
-            A DataFrame with the parsed similarity scores, or an empty
-            DataFrame on error.
+            A DataFrame with the parsed similarity scores.
+
+        Raises:
+            RuntimeError: If the subprocess exits with a non-zero return code.
         """
         self.expected_number_of_scores = expected_number_of_scores
         logger.debug("Running command: %s", " ".join(self.command))
@@ -66,8 +66,9 @@ class StructSimTool():
                 )
             scores = self._parse_output()
         except subprocess.CalledProcessError as e:
-            logger.error("Error running %s with %s: %s", self.name, self.command, e)
-            scores = pd.DataFrame()  # Return an empty DataFrame on error
+            raise RuntimeError(
+                f"{self.name} subprocess failed (exit {e.returncode}): {e.stderr}"
+            ) from e
         return scores
 
 

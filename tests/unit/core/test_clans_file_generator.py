@@ -1,5 +1,6 @@
 """Unit tests for clans3d.core.clans_file_generator.ClansFileGenerator."""
 import io
+import os
 import pytest
 import pandas as pd
 from Bio import SeqIO
@@ -155,7 +156,7 @@ class TestNormalizeScoresFormat:
             "Sequence_ID_2": ["B", "A"],
             "score": [0.5, 0.5],
         })
-        result = generator._normalize_scores_format(df, ["A", "B"])
+        result = generator._normalize_scores_format(df)
         assert len(result) == 1
 
     def test_preserves_asymmetric_pairs(self, generator):
@@ -164,7 +165,7 @@ class TestNormalizeScoresFormat:
             "Sequence_ID_2": ["B", "C"],
             "score": [0.5, 0.3],
         })
-        result = generator._normalize_scores_format(df, ["A", "B", "C"])
+        result = generator._normalize_scores_format(df)
         assert len(result) == 2
 
 
@@ -210,3 +211,55 @@ class TestParseClansFile:
         assert "P11111" in coord_uids
         assert "P22222" in coord_uids
         assert "P33333" in coord_uids
+
+
+# ---------------------------------------------------------------------------
+# _parse_param_block — edge cases
+# ---------------------------------------------------------------------------
+
+class TestParseParamBlockEdgeCases:
+    def test_value_containing_equals_sign(self, generator):
+        """Values with '=' must not be truncated (split maxsplit=1)."""
+        lines = ["<param>", "regex=a=b", "</param>"]
+        params = generator._parse_param_block(lines)
+        assert params == {"regex": "a=b"}
+
+
+# ---------------------------------------------------------------------------
+# _parse_scores_block — empty block
+# ---------------------------------------------------------------------------
+
+class TestParseScoresBlockEmpty:
+    def test_empty_hsp_block_returns_empty_dataframe(self, generator):
+        lines_empty_hsp = [l for l in MINIMAL_CLANS_LINES
+                           if l not in ("0 1:1.5e-30", "0 2:2.0e-28", "1 2:3.5e-25")]
+        result = generator._parse_scores_block(lines_empty_hsp)
+        assert result.empty
+        assert list(result.columns) == ["Sequence_ID_1", "Sequence_ID_2", "score"]
+
+
+# ---------------------------------------------------------------------------
+# generate_clans_file (integration)
+# ---------------------------------------------------------------------------
+
+class TestGenerateClansFile:
+    def test_creates_file_at_output_path(self, generator, small_fasta_path, small_scores_df, tmp_path):
+        out = str(tmp_path / "test.clans")
+        result = generator.generate_clans_file(small_scores_df, small_fasta_path, out)
+        assert result == out
+        assert os.path.exists(out)
+
+    def test_generated_content_has_correct_sections(self, generator, small_fasta_path, small_scores_df, tmp_path):
+        out = str(tmp_path / "test.clans")
+        generator.generate_clans_file(small_scores_df, small_fasta_path, out)
+        content = open(out).read()
+        for section in ["<seq>", "</seq>", "<pos>", "</pos>", "<hsp>", "</hsp>"]:
+            assert section in content
+
+    def test_generated_file_can_be_reparsed(self, generator, small_fasta_path, small_scores_df, tmp_path):
+        out = str(tmp_path / "test.clans")
+        generator.generate_clans_file(small_scores_df, small_fasta_path, out)
+        reparsed = generator.parse_clans_file(out)
+        assert reparsed.number_of_sequences == 3
+        assert len(reparsed.fasta_records) == 3
+        assert len(reparsed.scores) == 3
