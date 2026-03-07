@@ -20,7 +20,7 @@ class USalign(StructSimTool):
         super().__init__("USalign", description, working_dir)
         self.flag_dir = "-dir" # specifies the directory containing structure files
         self.flag_outfmt = "-outfmt" # specifies the output format
-        self.flag_outfmt = "2" # output format 2 is tab-separated with columns: PDBchain1, PDBchain2, TM1, TM2, ...
+        self.outfmt_value = "2" # output format 2 is tab-separated with columns: PDBchain1, PDBchain2, TM1, TM2, ...
         
         
     def start_run(self, structures_dir: str, expected_number_of_scores: int) -> pd.DataFrame:
@@ -43,7 +43,7 @@ class USalign(StructSimTool):
             for structure_name in structure_files:
                 f.write(f"{structure_name}\n")
         # example command: "USalign -dir structures_dir/ structure_names.txt -outfmt 2"
-        self.command = [self.name, self.flag_dir, structures_dir + "/", structure_names_list, self.flag_outfmt, self.flag_outfmt]
+        self.command = [self.name, self.flag_dir, structures_dir + "/", structure_names_list, self.flag_outfmt, self.outfmt_value]
         return self._execute_run(expected_number_of_scores)
 
     

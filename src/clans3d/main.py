@@ -33,7 +33,6 @@ def main():
         sys.exit(1)
 
     print(f"CLANS file: {clans_file_path}")
-    return clans_file_path, cleaned_input_file_path
 
 
 if __name__ == "__main__":
