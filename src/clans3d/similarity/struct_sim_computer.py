@@ -13,11 +13,16 @@ class StructSimComputer:
     """
     This class is responsible for computing structural similarities between protein structures using various tools.
     """
-    def __init__(self, foldseek_score="evalue"):
+    def __init__(self, foldseek_score: str = "evalue", working_dir: str = "work"):
         """
         Sets up a tool to compute structural similarities between protein structures.
+        
+        Args:
+            foldseek_score: Score type for Foldseek ("evalue" or "TM").
+            working_dir: Base directory for tool working files. Each tool creates its own subdirectory.
         """
         self.foldseek_score = foldseek_score
+        self.working_dir = working_dir
         self.results = {}    
 
 
@@ -39,8 +44,8 @@ class StructSimComputer:
     def _create_tool(self, tool_type: ToolType) -> StructSimTool:
         """Factory method to create the appropriate tool instance."""
         if tool_type == ToolType.FOLDSEEK:
-            return Foldseek(self.foldseek_score)
+            return Foldseek(self.foldseek_score, os.path.join(self.working_dir, "foldseek"))
         elif tool_type == ToolType.USALIGN:
-            return USalign()
+            return USalign(os.path.join(self.working_dir, "usalign"))
         else:
             raise ValueError(f"Tool {tool_type.value} is not available.")

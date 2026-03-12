@@ -43,7 +43,8 @@ class PipelineConfig:
         quiet: If ``True``, suppress all output except errors.  Overrides *verbose*.
         structures_dir: Directory for downloaded structures.
         output_dir: Directory for generated CLANS files.
-        input_storage_dir: Directory for cleaned/intermediate input files.
+        cleaned_input_storage: Directory for cleaned/intermediate input files.
+        tool_working_dir: Base directory for similarity tool working files.
     """
 
     def __init__(
@@ -57,6 +58,7 @@ class PipelineConfig:
         structures_dir: str = os.path.join("work", "structures"),
         output_dir: str = os.path.join("output", "clans_files"),
         cleaned_input_storage: str = os.path.join("work", "cleaned_input_storage"),
+        tool_working_dir: str = "work",
     ):
         self.input_file = input_file
         self.input_type = input_type
@@ -67,6 +69,7 @@ class PipelineConfig:
         self.structures_dir = structures_dir
         self.output_dir = output_dir
         self.cleaned_input_storage = cleaned_input_storage
+        self.tool_working_dir = tool_working_dir
 
 
 class ClansPipeline:
@@ -185,7 +188,10 @@ class ClansPipeline:
         """
         logger.info(f"Computing pairwise similarity scores with {self.config.tool.value}...")
         foldseek_score = self.config.foldseek_score or "evalue"
-        computer = StructSimComputer(foldseek_score=foldseek_score)
+        computer = StructSimComputer(
+            foldseek_score=foldseek_score,
+            working_dir=self.config.tool_working_dir
+        )
         scores = computer.run(self.config.tool, structures)
         return scores
 

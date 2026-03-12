@@ -43,7 +43,8 @@ class ScoresEvaluator:
                 foldseek_score=score,
                 structures_dir= os.path.join(self.working_dir, "structures"),
                 output_dir= self.clans_files_dir,
-                input_storage_dir= os.path.join(self.working_dir, "input_file_storage")
+                cleaned_input_storage= os.path.join(self.working_dir, "input_file_storage"),
+                tool_working_dir= self.working_dir
                 )
             pipeline = ClansPipeline(config)
             struct_clans_file_path, cleaned_input_file_as_fasta_path = pipeline.run()

@@ -24,10 +24,9 @@ class Foldseek(StructSimTool):
         3. (convert into readable output)
         foldseek convertalis <i:queryDb> <i:targetDb> <i:alignmentDB> <o:alignmentFile> [options][/+][-]
     """
-    def __init__(self, score):
+    def __init__(self, score: str, working_dir: str = os.path.join("work", "foldseek")):
         description = "A tool for protein structure comparison using Foldseek."
         self.score = score
-        working_dir = os.path.join("work", "foldseek")
         super().__init__("foldseek", description, working_dir)
         self.command_createdb = "createdb"  # command to create a database
         self.command_search = "search"  # command to search in the database

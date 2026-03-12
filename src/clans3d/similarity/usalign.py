@@ -14,9 +14,8 @@ class USalign(StructSimTool):
     """
     This class extends the StructSimTool class to implement the USalign tool for protein structure comparison.
     """
-    def __init__(self):
+    def __init__(self, working_dir: str = os.path.join("work", "usalign")):
         description = "A tool for protein structure comparison using USalign."
-        working_dir = os.path.join("work", "usalign")
         super().__init__("USalign", description, working_dir)
         self.flag_dir = "-dir" # specifies the directory containing structure files
         self.flag_outfmt = "-outfmt" # specifies the output format
