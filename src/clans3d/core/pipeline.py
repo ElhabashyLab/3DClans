@@ -21,7 +21,11 @@ from clans3d.core.clans_file_generator import ClansFileGenerator
 from clans3d.similarity.struct_sim_computer import StructSimComputer
 from clans3d.similarity.tool_type import ToolType
 from clans3d.utils.structure_utils import fetch_structures
-from clans3d.utils.fasta_utils import generate_fasta_from_uids_with_regions
+from clans3d.utils.fasta_utils import (
+    copy_records_from_fasta,
+    generate_fasta_from_uids_with_regions,
+    generate_fasta_from_alignment_file,
+)
 from clans3d.utils.log import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -97,6 +101,7 @@ class ClansPipeline:
         allowed_extensions = {
             InputFileType.FASTA: InputFileType.FASTA.value,
             InputFileType.A2M: InputFileType.A2M.value,
+            InputFileType.A3M: InputFileType.A3M.value,
             InputFileType.TSV: InputFileType.TSV.value
             }
         ext = os.path.basename(self.config.input_file).split(".")[1].lower()  # get extension without dot
@@ -157,10 +162,15 @@ class ClansPipeline:
         )
 
         if self.config.input_type == InputFileType.FASTA:
-            return generate_fasta_from_uids_with_regions(
+            # Copy sequences directly from original FASTA
+            uids = list(uids_with_regions.keys())
+            return copy_records_from_fasta(self.config.input_file, uids, cleaned_path)
+        elif self.config.input_type in (InputFileType.A2M, InputFileType.A3M):
+            # Strip alignment gaps locally, keeping all residues
+            return generate_fasta_from_alignment_file(
                 uids_with_regions, cleaned_path, self.config.input_file
             )
-        else:
+        else:  # TSV - download sequences from UniProt
             return generate_fasta_from_uids_with_regions(
                 uids_with_regions, cleaned_path
             )

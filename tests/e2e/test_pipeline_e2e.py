@@ -26,6 +26,7 @@ EXAMPLES_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "examples")
 )
 SMALL_FASTA = os.path.join(EXAMPLES_DIR, "small_fasta_files", "5.fasta")
+SMALL_TSV = os.path.join(EXAMPLES_DIR, "small_tsv_files", "5.tsv")
 
 # Expected number of successfully downloadable sequences (4 real MYOD1 orthologs)
 MIN_EXPECTED_SEQUENCES = 3
@@ -170,3 +171,43 @@ class TestCliEntrypoint:
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}"
         )
+
+
+@pytest.fixture
+def foldseek_tsv_pipeline(tmp_path):
+    if not shutil.which("foldseek"):
+        pytest.skip("foldseek not in PATH")
+    config = PipelineConfig(
+        input_file=SMALL_TSV,
+        input_type=InputFileType.TSV,
+        tool=ToolType.FOLDSEEK,
+        structures_dir=str(tmp_path / "structures"),
+        output_dir=str(tmp_path / "output"),
+        cleaned_input_storage=str(tmp_path / "cleaned"),
+    )
+    return ClansPipeline(config)
+
+
+@pytest.mark.e2e
+class TestPipelineTSVInput:
+    """E2E tests for the TSV input path.
+
+    TSV input differs from FASTA: the cleaned FASTA is generated from scratch
+    by downloading sequences from UniProt rather than copying from the original file.
+    """
+
+    def test_clans_file_is_created(self, foldseek_tsv_pipeline):
+        clans_path, _ = foldseek_tsv_pipeline.run()
+        assert os.path.isfile(clans_path)
+
+    def test_sequence_count_meets_minimum(self, foldseek_tsv_pipeline):
+        clans_path, _ = foldseek_tsv_pipeline.run()
+        assert _parse_sequence_count(clans_path) >= MIN_EXPECTED_SEQUENCES
+
+    def test_score_entries_present(self, foldseek_tsv_pipeline):
+        clans_path, _ = foldseek_tsv_pipeline.run()
+        assert _parse_score_count(clans_path) >= 1
+
+    def test_cleaned_fasta_is_written(self, foldseek_tsv_pipeline):
+        _, fasta_path = foldseek_tsv_pipeline.run()
+        assert os.path.isfile(fasta_path)

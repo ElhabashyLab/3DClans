@@ -274,39 +274,98 @@ def filter_input_file(in_path: str, out_path: str, dataset_type: InputFileType):
         raise ValueError("Unsupported dataset type. Use InputFileType.FASTA or InputFileType.TSV.")
 
 
-def generate_fasta_from_uids_with_regions(uids_with_regions: dict[str, tuple[int, int] | None], out_path: str, original_fasta=None):
+def generate_fasta_from_uids_with_regions(uids_with_regions: dict[str, tuple[int, int] | None], out_path: str):
     """
-    Generates a FASTA file containing the sequences (cut down to their corresponding regions) of the given UIDs.
-    The records will include the UID and region (if present) in the header.
-    
-    If original_fasta is provided, the method will copy only sequences which are also part of the uids_with_regions.
-    Otherwise the fasta file is generated from scratch and the Record IDs are of the format: UID or UID/start-end.
-    The sequences are cut to the specified regions if provided.
+    Generates a FASTA file by downloading sequences for the given UIDs and regions from UniProt.
 
     Args:
         uids_with_regions (dict[str, tuple[int, int] | None]): Mapping {uid: (region_start, region_end) | None}.
         out_path (str): Path to the output FASTA file.
-        original_fasta (str, optional): Path to an existing FASTA file with sequences.
     Returns:
         str: Path to the output FASTA file.
     """
     logger.debug("Generating FASTA from UIDs with regions...")
     uids = list(uids_with_regions.keys())
-    # generate fasta with records of original_fasta file
-    if original_fasta is not None:
-        copy_records_from_fasta(original_fasta, uids, out_path)
-    # generate fasta with possible regions from scratch
-    else:
-        records = []
-        uids_to_upis = uniprot_accessions_to_uniparc_accessions(uids)
-        for uid, region in uids_with_regions.items():
-            upi = uids_to_upis.get(uid)
-            try:
-                record = download_fasta_record(uid, upi, region)
-                record.id = uid
-                records.append(record)
-            except (ValueError, requests.exceptions.RequestException) as e:
-                logger.warning("Could not download %s: %s — using mock-up", uid, e)
-                records.append(create_mock_up_record(uid, region))
-        SeqIO.write(records, out_path, "fasta")
+    records = []
+    uids_to_upis = uniprot_accessions_to_uniparc_accessions(uids)
+    for uid, region in uids_with_regions.items():
+        upi = uids_to_upis.get(uid)
+        try:
+            record = download_fasta_record(uid, upi, region)
+            record.id = uid
+            records.append(record)
+        except (ValueError, requests.exceptions.RequestException) as e:
+            logger.warning("Could not download %s: %s — using mock-up", uid, e)
+            records.append(create_mock_up_record(uid, region))
+    SeqIO.write(records, out_path, "fasta")
+    return out_path
+
+
+def clean_aligned_sequence(seq: str) -> str:
+    """
+    Remove A2M/A3M gap characters from a sequence, keeping all amino acid residues.
+    
+    A2M/A3M format uses:
+    - Uppercase letters: match states (residues aligned to query) - KEPT
+    - Lowercase letters: insert states (insertions relative to query, but still real residues!) - KEPT
+    - Dots (.): gaps in insert states - REMOVED
+    - Dashes (-): gaps in match states - REMOVED
+    
+    This produces the TRUE sequence as it would appear in UniProt, not just the
+    aligned portion. Both uppercase and lowercase letters are real amino acids.
+    
+    Args:
+        seq: Raw sequence string from A2M/A3M file.
+        
+    Returns:
+        Clean uppercase sequence with only gap characters removed.
+    """
+    return ''.join(c.upper() for c in seq if c.isalpha())
+
+
+def generate_fasta_from_alignment_file(
+    uids_with_regions: dict[str, tuple[int, int] | None],
+    out_path: str,
+    alignment_file: str
+) -> str:
+    """
+    Generate clean FASTA from an A2M/A3M alignment file by stripping alignment characters.
+    
+    This function extracts sequences from the alignment file, removes lowercase insertions
+    and gap characters, and writes clean uppercase sequences to the output file.
+    Only sequences whose UIDs are in uids_with_regions (i.e., had successful structure downloads)
+    are included.
+    
+    Args:
+        uids_with_regions: Mapping {uid: (region_start, region_end) | None} of UIDs to include.
+        out_path: Path to the output FASTA file.
+        alignment_file: Path to the input A2M/A3M alignment file.
+        
+    Returns:
+        Path to the output FASTA file.
+    """
+    logger.debug("Generating FASTA from alignment file with cleaned sequences...")
+    records = []
+    
+    for record in SeqIO.parse(alignment_file, "fasta"):
+        try:
+            uid = extract_uid_from_recordID(record.id)
+        except ValueError:
+            continue  # Skip records with unextractable UIDs (these records were never downoaded)
+            
+        if uid not in uids_with_regions:
+            continue  # Skip UIDs that weren't successfully downloaded
+            
+        clean_seq = clean_aligned_sequence(str(record.seq))
+        region = uids_with_regions[uid]
+        
+        if region:
+            record_id = f"{uid}/{region[0]}-{region[1]}"
+        else:
+            record_id = uid
+            
+        records.append(SeqRecord(Seq(clean_seq), id=record_id, description=""))
+    
+    SeqIO.write(records, out_path, "fasta")
+    logger.debug("Wrote %d cleaned sequences to %s", len(records), out_path)
     return out_path

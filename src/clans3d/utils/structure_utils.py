@@ -86,7 +86,7 @@ def fetch_structures(input_file_path: str, input_file_type: InputFileType, outpu
         dict (str, tuple[int, int] | None): Containing downloaded uids together with their regions.
     """    
     reset_dir_content(output_dir)
-    if input_file_type is InputFileType.FASTA or input_file_type is InputFileType.A2M:
+    if input_file_type in (InputFileType.FASTA, InputFileType.A2M, InputFileType.A3M):
         return process_fasta_file(input_file_path, output_dir)
     elif input_file_type is InputFileType.TSV:
         return process_tsv_file(input_file_path, output_dir)

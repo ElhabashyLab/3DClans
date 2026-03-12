@@ -229,6 +229,13 @@ class TestFetchStructures:
         mock_proc.assert_called_once_with(small_fasta_path, str(tmp_path))
         assert result == self.EXPECTED_RESULT
 
+    def test_dispatches_a3m_to_process_fasta_file(self, small_fasta_path, tmp_path):
+        with patch(f"{MODULE}.reset_dir_content"), \
+             patch(f"{MODULE}.process_fasta_file", return_value=self.EXPECTED_RESULT) as mock_proc:
+            result = fetch_structures(small_fasta_path, InputFileType.A3M, str(tmp_path))
+        mock_proc.assert_called_once_with(small_fasta_path, str(tmp_path))
+        assert result == self.EXPECTED_RESULT
+
     def test_dispatches_tsv_to_process_tsv_file(self, small_tsv_path, tmp_path):
         with patch(f"{MODULE}.reset_dir_content"), \
              patch(f"{MODULE}.process_tsv_file", return_value=self.EXPECTED_RESULT) as mock_proc:

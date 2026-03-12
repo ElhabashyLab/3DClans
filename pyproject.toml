@@ -39,6 +39,7 @@ clans3d = "clans3d.main:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
+    "network: marks tests that require network access (may be skipped in CI)",
     "e2e: end-to-end tests requiring Foldseek and/or USalign in PATH (deselect with '-m not e2e')",
     "integration: integration tests using real fixture files but no external binaries",
     "regression: regression tests that compare output against stored baselines",

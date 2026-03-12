@@ -35,7 +35,7 @@ class ScoresEvaluator:
 
 
     def generate_clans_files(self, data: str, input_file_type: InputFileType, tool: ToolType, score: str | None) -> tuple[str, str]:
-        if input_file_type == InputFileType.FASTA or input_file_type == InputFileType.TSV or input_file_type == InputFileType.A2M:
+        if input_file_type in (InputFileType.FASTA, InputFileType.TSV, InputFileType.A2M, InputFileType.A3M):
             config = PipelineConfig(
                 input_file=data,
                 input_type=input_file_type,
@@ -50,7 +50,7 @@ class ScoresEvaluator:
             seq_clans_file_path = generate_clans_file_seq_based(cleaned_input_file_as_fasta_path, self.clans_files_dir, self.blast_dir)
             return (struct_clans_file_path, seq_clans_file_path)
         else:
-            raise ValueError(f"Invalid input file type: {input_file_type}. Supported types are {InputFileType.FASTA}, {InputFileType.TSV}, and {InputFileType.A2M}.")
+            raise ValueError(f"Invalid input file type: {input_file_type}. Supported types are FASTA, TSV, A2M, and A3M.")
         
     
     def cluster_clans_files(self,

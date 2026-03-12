@@ -8,6 +8,7 @@ class TestInputFileType:
     @pytest.mark.parametrize("value, expected", [
         ("fasta", InputFileType.FASTA),
         ("a2m",   InputFileType.A2M),
+        ("a3m",   InputFileType.A3M),
         ("clans", InputFileType.CLANS),
     ])
     def test_from_string(self, value, expected):

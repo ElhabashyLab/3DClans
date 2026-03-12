@@ -199,7 +199,7 @@ Integration tests live in `tests/integration/` and verify that pipeline componen
 pytest tests/integration/
 ```
 
-### `tests/integration/test_pipeline_mocked.py` — `TestPipelineMocked`
+### `tests/integration/test_pipeline_mocked.py` — `TestPipelineMocked` (FASTA input)
 
 Uses `tests/fixtures/small.fasta` (3 sequences) with `fetch_structures` and `StructSimComputer` mocked to return pre-built data. Runs `ClansPipeline.run()` end-to-end and asserts:
 
@@ -211,6 +211,17 @@ Uses `tests/fixtures/small.fasta` (3 sequences) with `fetch_structures` and `Str
 | `test_run_returns_existing_fasta_path`           | Cleaned FASTA path is returned and the file exists      |
 | `test_run_output_contains_all_required_sections` | All required CLANS sections are present                 |
 | `test_run_raises_when_no_structures_available`   | `RuntimeError` raised when no structures are downloaded |
+
+### `tests/integration/test_pipeline_mocked.py` — `TestPipelineMockedTSV` (TSV input)
+
+Uses `tests/fixtures/small.tsv` with the same mocks as above, plus `uniprot_accessions_to_uniparc_accessions` and `download_fasta_record` patched to avoid network calls. Exercises the TSV code path where cleaned FASTA is built from scratch rather than copied from the input file.
+
+| Test                                         | What is verified                                   |
+| -------------------------------------------- | -------------------------------------------------- |
+| `test_run_writes_clans_file`                 | Output `.clans` file is created on disk            |
+| `test_run_output_has_correct_sequence_count` | `sequences=3` appears in the output                |
+| `test_run_output_contains_all_hsp_entries`   | All 3 pairwise score entries appear in `<hsp>`     |
+| `test_run_returns_existing_fasta_path`       | Cleaned FASTA path is returned and the file exists |
 
 ---
 
@@ -251,11 +262,13 @@ pytest tests/e2e/ -m e2e
 
 ### `tests/e2e/test_pipeline_e2e.py`
 
-Input: `examples/small_fasta_files/5.fasta` (4 real MYOD1 orthologs + 1 unavailable entry; ≥ 3 structures expected to download successfully).
+FASTA input: `examples/small_fasta_files/5.fasta` (4 real MYOD1 orthologs + 1 unavailable entry; ≥ 3 structures expected to download successfully).
+TSV input: `examples/small_tsv_files/5.tsv` (same accessions in TSV format; sequences fetched from UniProt).
 
-| Class                        | Tool                | Tests                                                              |
-| ---------------------------- | ------------------- | ------------------------------------------------------------------ |
-| `TestPipelineFoldseekEvalue` | Foldseek (evalue)   | File created, ≥ 3 sequences, ≥ 1 score entry, all sections present |
-| `TestPipelineFoldseekTM`     | Foldseek (TM score) | File created, all scores in `[0, 1]`                               |
-| `TestPipelineUSalign`        | USalign             | File created, ≥ 3 sequences, ≥ 1 score entry                       |
-| `TestCliEntrypoint`          | Foldseek            | `clans3d` subprocess exits with code `0`                           |
+| Class                        | Tool                | Input | Tests                                                              |
+| ---------------------------- | ------------------- | ----- | ------------------------------------------------------------------ |
+| `TestPipelineFoldseekEvalue` | Foldseek (evalue)   | FASTA | File created, ≥ 3 sequences, ≥ 1 score entry, all sections present |
+| `TestPipelineFoldseekTM`     | Foldseek (TM score) | FASTA | File created, all scores in `[0, 1]`                               |
+| `TestPipelineUSalign`        | USalign             | FASTA | File created, ≥ 3 sequences, ≥ 1 score entry                       |
+| `TestCliEntrypoint`          | Foldseek            | FASTA | `clans3d` subprocess exits with code `0`                           |
+| `TestPipelineTSVInput`       | Foldseek (evalue)   | TSV   | File created, ≥ 3 sequences, ≥ 1 score entry, cleaned FASTA written |

@@ -20,6 +20,8 @@ from clans3d.utils.fasta_utils import (
     download_fasta_record,
     remove_non_existing_uniprot_accessions,
     generate_fasta_from_uids_with_regions,
+    clean_aligned_sequence,
+    generate_fasta_from_alignment_file,
 )
 
 MODULE = "clans3d.utils.fasta_utils"
@@ -371,27 +373,14 @@ class TestRemoveNonExistingUniprotAccessions:
 # ---------------------------------------------------------------------------
 
 class TestGenerateFastaFromUidsWithRegions:
+    """Tests for downloading sequences from UniProt (used for TSV input)."""
+
     API_MODULE = "clans3d.utils.fasta_utils.uniprot_accessions_to_uniparc_accessions"
 
     def _no_upi(self, uids):
         return {uid: None for uid in uids}
 
-    def test_with_original_fasta_copies_records(self, small_fasta_path, tmp_path):
-        out = str(tmp_path / "out.fasta")
-        uids_with_regions = {"P11111": None, "P22222": None}
-        generate_fasta_from_uids_with_regions(uids_with_regions, out, original_fasta=small_fasta_path)
-        written = [r.id for r in SeqIO.parse(out, "fasta")]
-        # only the two requested UIDs should appear
-        assert any("P11111" in uid for uid in written)
-        assert any("P22222" in uid for uid in written)
-        assert not any("P33333" in uid for uid in written)
-
-    def test_with_original_fasta_returns_out_path(self, small_fasta_path, tmp_path):
-        out = str(tmp_path / "out.fasta")
-        result = generate_fasta_from_uids_with_regions({"P11111": None}, out, original_fasta=small_fasta_path)
-        assert result == out
-
-    def test_without_original_fasta_returns_out_path(self, tmp_path):
+    def test_returns_out_path(self, tmp_path):
         out = str(tmp_path / "out.fasta")
         uids = {"P11111": None}
         with patch(self.API_MODULE, return_value=self._no_upi(uids)), \
@@ -399,7 +388,7 @@ class TestGenerateFastaFromUidsWithRegions:
             result = generate_fasta_from_uids_with_regions(uids, out)
         assert result == out
 
-    def test_without_original_fasta_writes_file(self, tmp_path):
+    def test_writes_file(self, tmp_path):
         out = str(tmp_path / "out.fasta")
         uids = {"P11111": None}
         with patch(self.API_MODULE, return_value=self._no_upi(uids)), \
@@ -457,3 +446,221 @@ class TestGenerateFastaFromUidsWithRegions:
             generate_fasta_from_uids_with_regions({}, out)
         records = list(SeqIO.parse(out, "fasta"))
         assert records == []
+
+
+# ---------------------------------------------------------------------------
+# clean_aligned_sequence
+# ---------------------------------------------------------------------------
+
+class TestCleanAlignedSequence:
+    """Tests for gap removal from A2M/A3M sequences (keeps all real residues)."""
+
+    def test_keeps_lowercase_insertions(self):
+        # Lowercase letters are real residues (insertions relative to query)
+        assert clean_aligned_sequence("MKLVFFaavvAED") == "MKLVFFAAVVAED"
+
+    def test_removes_dots(self):
+        assert clean_aligned_sequence("..MKLVFF") == "MKLVFF"
+
+    def test_removes_dashes(self):
+        assert clean_aligned_sequence("-MKLVFF--AED") == "MKLVFFAED"
+
+    def test_uppercases_all_letters(self):
+        # All letters (both cases) are kept and uppercased
+        assert clean_aligned_sequence("MKlvFF") == "MKLVFF"
+
+    def test_mixed_alignment_characters(self):
+        # Real example from A2M file: dots are removed, all letters kept
+        assert clean_aligned_sequence("..sPQEFASqlakPLGAK") == "SPQEFASQLAKPLGAK"
+
+    def test_empty_string(self):
+        assert clean_aligned_sequence("") == ""
+
+    def test_only_gaps(self):
+        # Only dots and dashes - no residues
+        assert clean_aligned_sequence("..--..") == ""
+
+    def test_only_lowercase(self):
+        # Lowercase letters are real residues, should be kept
+        assert clean_aligned_sequence("aabb") == "AABB"
+
+    def test_real_a2m_sequence(self):
+        # From examples/big_fasta_files/C5BN68_TERTT_528-601_b0.3.a2m
+        # The sequence has leading dots (gaps) and lowercase letters (real insertions)
+        seq = "..sPQEFASQLAKPLGAKTAQREVEQALRDLHLPFDERRPYALRRLRDRIEANLSGLMGPSVAQDMVESFlpyk"
+        # True sequence: all letters kept (s, lpyk are real residues), dots removed
+        expected = "SPQEFASQLAKPLGAKTAQREVEQALRDLHLPFDERRPYALRRLRDRIEANLSGLMGPSVAQDMVESFLPYK"
+        assert clean_aligned_sequence(seq) == expected
+
+
+# ---------------------------------------------------------------------------
+# generate_fasta_from_alignment_file
+# ---------------------------------------------------------------------------
+
+class TestGenerateFastaFromAlignmentFile:
+    """Tests for generating clean FASTA from A2M/A3M alignment files."""
+
+    def test_produces_true_sequences(self, tmp_path):
+        """Verify gaps removed but all real residues (including lowercase) kept."""
+        # Create a mock A2M file
+        a2m_content = """>tr|P11111|P11111_HUMAN/10-20
+..sPQEFASQLAK
+>tr|P22222|P22222_HUMAN/5-15
+MKLVFFaavvAED
+"""
+        a2m_file = tmp_path / "test.a2m"
+        a2m_file.write_text(a2m_content)
+        out_path = tmp_path / "out.fasta"
+
+        uids_with_regions = {
+            "P11111": (10, 20),
+            "P22222": (5, 15),
+        }
+
+        generate_fasta_from_alignment_file(uids_with_regions, str(out_path), str(a2m_file))
+
+        records = {r.id: str(r.seq) for r in SeqIO.parse(str(out_path), "fasta")}
+        # Lowercase 's' is kept (real residue), dots removed
+        assert records["P11111/10-20"] == "SPQEFASQLAK"
+        # Lowercase 'aavv' are kept (real insertion residues)
+        assert records["P22222/5-15"] == "MKLVFFAAVVAED"
+
+    def test_skips_uids_not_in_mapping(self, tmp_path):
+        """Only include UIDs that are in the uids_with_regions mapping."""
+        a2m_content = """>tr|P11111|P11111_HUMAN/10-20
+MKLVFF
+>tr|P22222|P22222_HUMAN/5-15
+ACDEFG
+"""
+        a2m_file = tmp_path / "test.a2m"
+        a2m_file.write_text(a2m_content)
+        out_path = tmp_path / "out.fasta"
+
+        # Only P11111 is in the mapping
+        uids_with_regions = {"P11111": (10, 20)}
+
+        generate_fasta_from_alignment_file(uids_with_regions, str(out_path), str(a2m_file))
+
+        records = list(SeqIO.parse(str(out_path), "fasta"))
+        assert len(records) == 1
+        assert records[0].id == "P11111/10-20"
+
+    def test_handles_no_region(self, tmp_path):
+        """When region is None, output just the UID."""
+        a2m_content = """>tr|P11111|P11111_HUMAN
+MKLVFF
+"""
+        a2m_file = tmp_path / "test.a2m"
+        a2m_file.write_text(a2m_content)
+        out_path = tmp_path / "out.fasta"
+
+        uids_with_regions = {"P11111": None}
+
+        generate_fasta_from_alignment_file(uids_with_regions, str(out_path), str(a2m_file))
+
+        records = list(SeqIO.parse(str(out_path), "fasta"))
+        assert len(records) == 1
+        assert records[0].id == "P11111"
+
+    def test_skips_invalid_headers(self, tmp_path):
+        """Skip entries without valid UniProt accession."""
+        a2m_content = """>invalid_header
+MKLVFF
+>tr|P11111|P11111_HUMAN
+ACDEFG
+"""
+        a2m_file = tmp_path / "test.a2m"
+        a2m_file.write_text(a2m_content)
+        out_path = tmp_path / "out.fasta"
+
+        uids_with_regions = {"P11111": None}
+
+        generate_fasta_from_alignment_file(uids_with_regions, str(out_path), str(a2m_file))
+
+        records = list(SeqIO.parse(str(out_path), "fasta"))
+        assert len(records) == 1
+        assert records[0].id == "P11111"
+
+    def test_empty_alignment_file(self, tmp_path):
+        """Handle empty alignment file."""
+        a2m_file = tmp_path / "empty.a2m"
+        a2m_file.write_text("")
+        out_path = tmp_path / "out.fasta"
+
+        generate_fasta_from_alignment_file({}, str(out_path), str(a2m_file))
+
+        records = list(SeqIO.parse(str(out_path), "fasta"))
+        assert records == []
+
+
+class TestCleanedSequenceMatchesRegionLength:
+    """Verify cleaned sequences have correct length for specified regions."""
+
+    def test_cleaned_length_matches_region_span(self):
+        """Cleaned sequence should have exactly (end - start + 1) residues."""
+        # Real A2M sequence from C5BN68_TERTT_528-601_b0.3.a2m
+        # Region: 524-595 (72 residues expected)
+        a2m_seq = "..sPQEFASQLAKPLGAKTAQREVEQALRDLHLPFDERRPYALRRLRDRIEANLSGLMGPSVAQDMVESFlpyk"
+        
+        cleaned = clean_aligned_sequence(a2m_seq)
+        
+        # 595 - 524 + 1 = 72 residues
+        assert len(cleaned) == 72
+        # Should start with S (from lowercase 's') and end with K (from uppercase 'K' or lowercase 'k')
+        assert cleaned.startswith("S")
+        assert cleaned.endswith("K")
+
+    def test_multiple_regions_correct_length(self):
+        """Test multiple A2M entries have correct cleaned lengths."""
+        test_cases = [
+            # (a2m_sequence, region_start, region_end)
+            ("iraPEEIVERLTHRIGETTARAEVNRALEQLGFNVGESRPYALRRLRDEVEANLSGLMGISMATEIMDSElpyk", 528, 601),
+            ("..sPQEFASQLAKPLGAKTAQREVEQALRDLHLPFDERRPYALRRLRDRIEANLSGLMGPSVAQDMVESFlpyk", 524, 595),
+            ("..sPQEFATQLAKPLGAKAAQKEVEQALRDLYLPFDERRPYALRRLRDRIEANLSGLMGPSVAQDMVETFlpyk", 73, 144),
+        ]
+        
+        for a2m_seq, start, end in test_cases:
+            cleaned = clean_aligned_sequence(a2m_seq)
+            expected_len = end - start + 1
+            assert len(cleaned) == expected_len, (
+                f"Region {start}-{end} should have {expected_len} residues, "
+                f"got {len(cleaned)}: {cleaned}"
+            )
+
+    def test_only_gaps_are_removed(self):
+        """Dots and dashes removed, all letters (upper+lower) kept."""
+        # Construct a sequence where we know exactly what should remain
+        # 5 uppercase + 3 lowercase + 2 dots + 2 dashes = 12 chars input
+        # Expected: 8 uppercase letters
+        test_seq = "AB..cd--EFgh"
+        cleaned = clean_aligned_sequence(test_seq)
+        
+        assert cleaned == "ABCDEFGH"
+        assert len(cleaned) == 8
+
+    def test_real_a2m_file_entry_structure(self, tmp_path):
+        """Full pipeline test: A2M file → cleaned FASTA with correct lengths."""
+        # Multi-line A2M entry (as in real files)
+        a2m_content = """>tr|A0A2M8UWB6|A0A2M8UWB6_PSESP/524-595
+..sPQEFASQLAKPLGAKTAQREVEQALRDLHLPFDERRPYALRRLRDRIEANLSGLMGP
+SVAQDMVESFlpyk
+"""
+        a2m_file = tmp_path / "test.a2m"
+        a2m_file.write_text(a2m_content)
+        out_path = tmp_path / "out.fasta"
+
+        uids_with_regions = {"A0A2M8UWB6": (524, 595)}
+
+        generate_fasta_from_alignment_file(uids_with_regions, str(out_path), str(a2m_file))
+
+        records = list(SeqIO.parse(str(out_path), "fasta"))
+        assert len(records) == 1
+        
+        seq = str(records[0].seq)
+        expected_len = 595 - 524 + 1  # 72
+        assert len(seq) == expected_len, f"Expected {expected_len} residues, got {len(seq)}"
+        
+        # Verify all uppercase (no lowercase or gaps leaked through)
+        assert seq == seq.upper()
+        assert "." not in seq
+        assert "-" not in seq

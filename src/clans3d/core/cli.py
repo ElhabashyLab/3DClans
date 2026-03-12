@@ -32,7 +32,8 @@ def _build_main_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-i", "--input_type",
         required=True,
-        choices=[InputFileType.FASTA.value, InputFileType.A2M.value, InputFileType.TSV.value],
+        choices=[InputFileType.FASTA.value, InputFileType.A2M.value, 
+                 InputFileType.A3M.value, InputFileType.TSV.value],
         help="specifies the type of the input file",
     )
 
