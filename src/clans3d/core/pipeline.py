@@ -45,6 +45,7 @@ class PipelineConfig:
         output_dir: Directory for generated CLANS files.
         cleaned_input_storage: Directory for cleaned/intermediate input files.
         tool_working_dir: Base directory for similarity tool working files.
+        download_workers: Maximum number of concurrent structure download threads. Default is 10.
     """
 
     def __init__(
@@ -59,6 +60,7 @@ class PipelineConfig:
         output_dir: str = os.path.join("output", "clans_files"),
         cleaned_input_storage: str = os.path.join("work", "cleaned_input_storage"),
         tool_working_dir: str = "work",
+        download_workers: int = 10,
     ):
         self.input_file = input_file
         self.input_type = input_type
@@ -70,6 +72,7 @@ class PipelineConfig:
         self.output_dir = output_dir
         self.cleaned_input_storage = cleaned_input_storage
         self.tool_working_dir = tool_working_dir
+        self.download_workers = download_workers
 
 
 class ClansPipeline:
@@ -138,6 +141,7 @@ class ClansPipeline:
             self.config.input_file,
             self.config.input_type,
             self.config.structures_dir,
+            max_workers=self.config.download_workers,
         )
         if not uids_with_regions:
             raise RuntimeError(

@@ -21,7 +21,7 @@ def download_file(url, output_path):
                 f.write(chunk)
         return True
     except Exception as e:
-        logger.warning(f"Failed to download {url}: {e}")
+        logger.debug(f"Failed to download {url}: {e}")
         return False
     
 

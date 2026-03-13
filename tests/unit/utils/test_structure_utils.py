@@ -1,5 +1,6 @@
 """Unit tests for clans3d.utils.structure_utils."""
 import os
+from concurrent.futures import Future
 import pytest
 import pandas as pd
 import requests
@@ -11,6 +12,7 @@ from clans3d.utils.structure_utils import (
     _log_interval,
     _parse_region_from_tsv_row,
     _fetch_alphafold_cif_url,
+    _run_download_tasks,
     download_alphafold_structure,
     extract_region_of_protein,
     fetch_structures,
@@ -127,28 +129,28 @@ class TestFetchAlphafoldCifUrl:
             result = _fetch_alphafold_cif_url("P00000")
         assert result == self.CIF_URL
 
-    def test_returns_none_on_http_error(self):
+    def test_returns_false_on_http_error(self):
         resp = _mock_response([], status_ok=False)
         with patch(f"{MODULE}.requests.get", return_value=resp):
             result = _fetch_alphafold_cif_url("P00000")
-        assert result is None
+        assert result is False
 
-    def test_returns_none_on_connection_error(self):
+    def test_returns_false_on_connection_error(self):
         with patch(f"{MODULE}.requests.get", side_effect=requests.ConnectionError()):
             result = _fetch_alphafold_cif_url("P00000")
-        assert result is None
+        assert result is False
 
-    def test_returns_none_on_empty_predictions(self):
+    def test_returns_false_on_empty_predictions(self):
         resp = _mock_response([])
         with patch(f"{MODULE}.requests.get", return_value=resp):
             result = _fetch_alphafold_cif_url("P00000")
-        assert result is None
+        assert result is False
 
-    def test_returns_none_when_no_cif_url_in_response(self):
+    def test_returns_false_when_no_cif_url_in_response(self):
         resp = _mock_response([{"pdbUrl": "https://example.com/something.pdb"}])
         with patch(f"{MODULE}.requests.get", return_value=resp):
             result = _fetch_alphafold_cif_url("P00000")
-        assert result is None
+        assert result is False
 
     def test_queries_correct_api_url(self):
         resp = _mock_response([{"cifUrl": self.CIF_URL}])
@@ -168,7 +170,7 @@ class TestDownloadAlphafoldStructure:
     CIF_URL = "https://alphafold.ebi.ac.uk/files/AF-P00000-F1-model_v4.cif"
 
     def test_returns_false_when_no_cif_url(self, tmp_path):
-        with patch(f"{MODULE}._fetch_alphafold_cif_url", return_value=None):
+        with patch(f"{MODULE}._fetch_alphafold_cif_url", return_value=False):
             result = download_alphafold_structure("P00000", str(tmp_path), None)
         assert result is False
 
@@ -219,28 +221,42 @@ class TestFetchStructures:
         with patch(f"{MODULE}.reset_dir_content"), \
              patch(f"{MODULE}.process_fasta_file", return_value=self.EXPECTED_RESULT) as mock_proc:
             result = fetch_structures(small_fasta_path, InputFileType.FASTA, str(tmp_path))
-        mock_proc.assert_called_once_with(small_fasta_path, str(tmp_path))
+        mock_proc.assert_called_once_with(small_fasta_path, str(tmp_path), max_workers=10)
         assert result == self.EXPECTED_RESULT
 
     def test_dispatches_a2m_to_process_fasta_file(self, small_fasta_path, tmp_path):
         with patch(f"{MODULE}.reset_dir_content"), \
              patch(f"{MODULE}.process_fasta_file", return_value=self.EXPECTED_RESULT) as mock_proc:
             result = fetch_structures(small_fasta_path, InputFileType.A2M, str(tmp_path))
-        mock_proc.assert_called_once_with(small_fasta_path, str(tmp_path))
+        mock_proc.assert_called_once_with(small_fasta_path, str(tmp_path), max_workers=10)
         assert result == self.EXPECTED_RESULT
 
     def test_dispatches_a3m_to_process_fasta_file(self, small_fasta_path, tmp_path):
         with patch(f"{MODULE}.reset_dir_content"), \
              patch(f"{MODULE}.process_fasta_file", return_value=self.EXPECTED_RESULT) as mock_proc:
             result = fetch_structures(small_fasta_path, InputFileType.A3M, str(tmp_path))
-        mock_proc.assert_called_once_with(small_fasta_path, str(tmp_path))
+        mock_proc.assert_called_once_with(small_fasta_path, str(tmp_path), max_workers=10)
         assert result == self.EXPECTED_RESULT
 
     def test_dispatches_tsv_to_process_tsv_file(self, small_tsv_path, tmp_path):
         with patch(f"{MODULE}.reset_dir_content"), \
              patch(f"{MODULE}.process_tsv_file", return_value=self.EXPECTED_RESULT) as mock_proc:
             result = fetch_structures(small_tsv_path, InputFileType.TSV, str(tmp_path))
-        mock_proc.assert_called_once_with(small_tsv_path, str(tmp_path))
+        mock_proc.assert_called_once_with(small_tsv_path, str(tmp_path), max_workers=10)
+        assert result == self.EXPECTED_RESULT
+
+    def test_dispatches_custom_workers_to_process_fasta_file(self, small_fasta_path, tmp_path):
+        with patch(f"{MODULE}.reset_dir_content"), \
+             patch(f"{MODULE}.process_fasta_file", return_value=self.EXPECTED_RESULT) as mock_proc:
+            result = fetch_structures(small_fasta_path, InputFileType.FASTA, str(tmp_path), max_workers=23)
+        mock_proc.assert_called_once_with(small_fasta_path, str(tmp_path), max_workers=23)
+        assert result == self.EXPECTED_RESULT
+
+    def test_dispatches_custom_workers_to_process_tsv_file(self, small_tsv_path, tmp_path):
+        with patch(f"{MODULE}.reset_dir_content"), \
+             patch(f"{MODULE}.process_tsv_file", return_value=self.EXPECTED_RESULT) as mock_proc:
+            result = fetch_structures(small_tsv_path, InputFileType.TSV, str(tmp_path), max_workers=23)
+        mock_proc.assert_called_once_with(small_tsv_path, str(tmp_path), max_workers=23)
         assert result == self.EXPECTED_RESULT
 
     def test_raises_for_unsupported_type(self, tmp_path):
@@ -253,6 +269,63 @@ class TestFetchStructures:
              patch(f"{MODULE}.process_fasta_file", return_value={}):
             fetch_structures(small_fasta_path, InputFileType.FASTA, str(tmp_path))
         mock_reset.assert_called_once_with(str(tmp_path))
+
+
+# ---------------------------------------------------------------------------
+# _run_download_tasks
+# ---------------------------------------------------------------------------
+
+class TestRunDownloadTasks:
+    def test_returns_only_successful_downloads(self, tmp_path):
+        tasks = [
+            ("P11111", None),
+            ("P22222", (10, 50)),
+            ("P33333", (5, 25)),
+        ]
+
+        def side_effect(uid, _output_dir, _region):
+            return uid != "P22222"
+
+        with patch(f"{MODULE}.download_alphafold_structure", side_effect=side_effect):
+            result = _run_download_tasks(tasks, str(tmp_path), max_workers=2)
+
+        assert result == {
+            "P11111": None,
+            "P33333": (5, 25),
+        }
+
+    def test_uses_configured_max_workers(self, tmp_path):
+        tasks: list[tuple[str, tuple[int, int] | None]] = [("P11111", None)]
+        captured = {}
+
+        class DummyExecutor:
+            def __init__(self, max_workers):
+                captured["max_workers"] = max_workers
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def submit(self, fn, *args, **kwargs):
+                fut = Future()
+                fut.set_result(fn(*args, **kwargs))
+                return fut
+
+        with patch(f"{MODULE}.ThreadPoolExecutor", DummyExecutor), \
+             patch(f"{MODULE}.download_alphafold_structure", return_value=True):
+            result = _run_download_tasks(tasks, str(tmp_path), max_workers=23)
+
+        assert captured["max_workers"] == 23
+        assert result == {"P11111": None}
+
+    def test_propagates_worker_exceptions(self, tmp_path):
+        tasks: list[tuple[str, tuple[int, int] | None]] = [("P11111", None)]
+
+        with patch(f"{MODULE}.download_alphafold_structure", side_effect=RuntimeError("boom")):
+            with pytest.raises(RuntimeError, match="boom"):
+                _run_download_tasks(tasks, str(tmp_path), max_workers=2)
 
 
 # ---------------------------------------------------------------------------

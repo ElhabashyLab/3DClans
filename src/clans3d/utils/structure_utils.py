@@ -1,6 +1,8 @@
 import logging
 import os
 import requests
+from typing import Literal
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 from Bio import SeqIO
 from Bio.PDB.MMCIFParser import MMCIFParser
@@ -43,16 +45,16 @@ def _parse_region_from_tsv_row(row: pd.Series) -> tuple[int, int] | None:
     return (start, end)
 
 
-def _fetch_alphafold_cif_url(accession_id: str) -> str | None:
+def _fetch_alphafold_cif_url(accession_id: str) -> str | Literal[False]:
     """
     Queries the AlphaFold DB REST API and returns the CIF download URL for the
-    given accession, or None if the request fails or no URL is found.
+    given accession, or False if the request fails or no URL is found.
 
     Args:
         accession_id (str): UniProt accession to look up.
 
     Returns:
-        str | None: CIF download URL, or None on failure.
+        str | Literal[False]: CIF download URL, or False on failure.
     """
     api_url = f"https://alphafold.ebi.ac.uk/api/prediction/{accession_id}"
     try:
@@ -61,113 +63,154 @@ def _fetch_alphafold_cif_url(accession_id: str) -> str | None:
         predictions = response.json()
     except requests.RequestException as e:
         logger.debug("Failed to reach AlphaFold API for %s: %s", accession_id, e)
-        return None
+        return False
     if not predictions:
         logger.debug("No predictions found in AlphaFold API response for %s.", accession_id)
-        return None
+        return False
     url = predictions[0].get("cifUrl")
     if not url:
         logger.debug("No cifUrl in AlphaFold API response for %s.", accession_id)
+        return False
     return url
 
 
-def fetch_structures(input_file_path: str, input_file_type: InputFileType, output_dir: str) -> dict[str, tuple[int, int] | None]:
+def _run_download_tasks(
+    tasks: list[tuple[str, tuple[int, int] | None]],
+    output_dir: str,
+    max_workers: int = 10,
+) -> dict[str, tuple[int, int] | None]:
+    """Run download/optional-region-extraction tasks concurrently.
+
+    Args:
+        tasks: List of ``(uid, region)`` tuples to process.
+        output_dir: Directory where structures are written.
+        max_workers: Number of concurrent download threads.
+
+    Returns:
+        Mapping of successfully downloaded UIDs to their regions.
+    """
+    total = len(tasks)
+    interval = _log_interval(total)
+    successful_downloads = 0
+    uids_with_regions: dict[str, tuple[int, int] | None] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_task = {
+            executor.submit(download_alphafold_structure, uid, output_dir, region): (uid, region)
+            for uid, region in tasks
+        }
+        completed = 0
+        for future in as_completed(future_to_task):
+            uid, region = future_to_task[future]
+            completed += 1
+            if future.result():
+                uids_with_regions[uid] = region
+                successful_downloads += 1
+            else:
+                logger.warning("Skipping entry '%s': could not download AlphaFold structure.", uid)
+            if completed % interval == 0 or completed == total:
+                logger.info("Processing %d/%d structures...", completed, total)
+
+    failed = total - successful_downloads
+    logger.info("Downloaded %d/%d structure files (%d failed).", successful_downloads, total, failed)
+    return uids_with_regions
+
+
+def fetch_structures(
+    input_file_path: str,
+    input_file_type: InputFileType,
+    output_dir: str,
+    max_workers: int = 10,
+) -> dict[str, tuple[int, int] | None]:
     """
     Fetches and stores structure files, specified in a given input_file in a output directory.
     The contents of the output dir will be overwritten.
     It returns a dict containing {uid : (region_start, region_end)} of the sequences that have been successfully downloaded.
+    Threading is used to speed up the process of downloading and region extraction.
+    ``max_workers`` controls the pool size
     
     Args:
         input_file_path: Path to the input file.
         input_file_type: Specifies the type of the input file.
         output_dir: The directory where the downloaded structures are stored.
+        max_workers: Maximum number of concurrent download threads (default: 10).
         
     Returns:
         dict (str, tuple[int, int] | None): Containing downloaded uids together with their regions.
     """    
     reset_dir_content(output_dir)
     if input_file_type in (InputFileType.FASTA, InputFileType.A2M, InputFileType.A3M):
-        return process_fasta_file(input_file_path, output_dir)
+        return process_fasta_file(input_file_path, output_dir, max_workers=max_workers)
     elif input_file_type is InputFileType.TSV:
-        return process_tsv_file(input_file_path, output_dir)
+        return process_tsv_file(input_file_path, output_dir, max_workers=max_workers)
     else:
         raise ValueError(f"Unsupported input file type: {input_file_type}")
     
 
-def process_fasta_file(input_file_path: str, output_dir: str) -> dict:
+def process_fasta_file(input_file_path: str, output_dir: str, max_workers: int = 10) -> dict:
     """
     Downloads the structures of the sequences in the given fasta_file.
     It also creates a dictionary with an entry for each downloaded record: {uid : region}
     The region can be None if not specified in the header of the fasta records.
 
+    Downloads and region extraction run concurrently (``max_workers`` threads).
+    Results are collected in order of completion; progress is logged from
+    the main thread so no locking is needed.
+
     Args:
         input_file_path (str): Path to fasta file.
         output_dir (str): Directory in which to save the downloaded structures.
+        max_workers (int): Number of concurrent download threads (default: 10).
 
     Returns:
         dict: Containing downloaded uids together with their regions.
     """
-    successful_downloads = 0
-    uids_with_regions = {}
     records = list(SeqIO.parse(input_file_path, "fasta"))
-    total_records = len(records)
-    interval = _log_interval(total_records)
-    for idx, record in enumerate(records, 1):
+
+    # Parse all (uid, region) pairs first so we can report skips before submitting
+    tasks: list[tuple[str, tuple[int, int] | None]] = []
+    for record in records:
         try:
             uid = extract_uid_from_recordID(record.id)
             region = extract_region_from_record(record)
+            tasks.append((uid, region))
         except ValueError as e:
             logger.warning("Skipping entry '%s': %s", record.id, e)
-            if idx % interval == 0 or idx == total_records:
-                logger.info("Downloaded %d/%d structures...", idx, total_records)
-            continue
-        if download_alphafold_structure(uid, output_dir, region):
-            uids_with_regions[uid] = region
-            successful_downloads += 1
-        else:
-            logger.warning("Skipping entry '%s': could not download AlphaFold structure.", uid)
-        if idx % interval == 0 or idx == total_records:
-            logger.info("Downloaded %d/%d structures...", idx, total_records)
-    failed = total_records - successful_downloads
-    logger.info("Downloaded %d/%d structure files (%d failed).", successful_downloads, total_records, failed)
-    return uids_with_regions
+
+    return _run_download_tasks(tasks, output_dir, max_workers=max_workers)
 
 
-def process_tsv_file(input_file_path: str, output_dir: str) -> dict:
+def process_tsv_file(input_file_path: str, output_dir: str, max_workers: int = 10) -> dict:
     """
     Downloads the structures of the uids in the given tsv file.
     It also creates a dictionary with an entry for each downloaded record. {uid : [region]}
     The tsv file should contain the columns [entry, region_start, region_end].
 
+    Downloads and region extraction run concurrently (``max_workers`` threads).
+    Results are collected in order of completion; progress is logged from
+    the main thread so no locking is needed.
+
     Args:
         input_file_path (str): Path to tsv file.
         output_dir (str): Directory in which to save the downloaded structures.
+        max_workers (int): Number of concurrent download threads (default: 10).
 
     Returns:
         dict: Containing downloaded records together with their regions.
     """
     df = pd.read_csv(input_file_path, sep='\t')
-    successful_downloads = 0
-    uids_with_regions = {}
-    total_uids = len(df)
-    interval = _log_interval(total_uids)
-    for idx, (_, row) in enumerate(df.iterrows(), 1):
+
+    # Parse all (uid, region) pairs first so we can report skips before submitting
+    tasks: list[tuple[str, tuple[int, int] | None]] = []
+    for _, row in df.iterrows():
         uid = row['entry']
         try:
             region = _parse_region_from_tsv_row(row)
+            tasks.append((uid, region))
         except ValueError as e:
             logger.warning("Skipping entry '%s': %s", uid, e)
-            continue
-        if download_alphafold_structure(uid, output_dir, region):
-            successful_downloads += 1
-            uids_with_regions[uid] = region
-        else:
-            logger.warning("Skipping entry '%s': could not download AlphaFold structure.", uid)
-        if idx % interval == 0 or idx == total_uids:
-            logger.info("Downloaded %d/%d structures...", idx, total_uids)
-    failed = total_uids - successful_downloads
-    logger.info("Downloaded %d/%d structure files (%d failed).", successful_downloads, total_uids, failed)
-    return uids_with_regions
+
+    return _run_download_tasks(tasks, output_dir, max_workers=max_workers)
 
 
 def download_alphafold_structure(

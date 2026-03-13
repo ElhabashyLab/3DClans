@@ -53,7 +53,7 @@ Input File (FASTA / A2M / A3M / TSV)
 ```
 
 1. **Input parsing** — Extracts UniProt accessions and optional region annotations from the input file.
-2. **Structure retrieval** — Downloads AlphaFold-predicted structures in CIF format. If a region is specified (e.g., residues 2–300), only that region is extracted.
+2. **Structure retrieval** — Downloads AlphaFold-predicted structures in CIF format. If a region is specified (e.g., residues 2–300), only that region is extracted. Downloads run in parallel (default: 10 workers), configurable via `-w/--workers`.
 3. **Pairwise similarity** — Runs an all-vs-all structural comparison using Foldseek (fast, E-value or TM-score) or USalign (slower, TM-score). This produces `n*(n-1)/2` pairwise scores.
 4. **CLANS file generation** — Writes a CLANS-format file containing the sequences, pairwise scores, and initial random 3D coordinates for visualization.
 
@@ -180,6 +180,7 @@ clans3d -l <INPUT_FILE> -i <INPUT_TYPE> -t <TOOL> [OPTIONS]
 | --------------------- | ------------------------------------------------------------------------------ |
 | `-s, --score <SCORE>` | Foldseek score type: `evalue` (default) or `TM`. Only valid with `-t foldseek` |
 | `-c, --conf <PATH>`   | Configuration file (CLI arguments override config values)                      |
+| `-w, --workers <N>`   | Number of parallel threads for structure downloads (default: `10`)             |
 | `-v, --verbose`       | Enable debug-level logging                                                     |
 | `-q, --quiet`         | Suppress all output except errors                                              |
 
@@ -224,6 +225,7 @@ Configuration files use the format `-key value`, one per line:
 -input_type fasta
 -tool foldseek
 -score evalue
+-workers 20
 -verbose
 ```
 
@@ -268,6 +270,14 @@ clans3d -l proteins.tsv -i tsv -t foldseek -s evalue
 ```bash
 clans3d -l proteins.fasta -i fasta -t foldseek -v
 ```
+
+#### Increase parallel structure downloads
+
+```bash
+clans3d -l proteins.fasta -i fasta -t foldseek -w 30
+```
+
+Use higher values on fast networks for large inputs. If the AlphaFold API rate-limits requests, reduce the value.
 
 ### Output
 

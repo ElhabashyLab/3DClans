@@ -24,6 +24,7 @@ def main():
         foldseek_score=args.score,
         verbose=args.verbose,
         quiet=args.quiet,
+        download_workers=args.workers,
     )
     pipeline = ClansPipeline(config)
     try:

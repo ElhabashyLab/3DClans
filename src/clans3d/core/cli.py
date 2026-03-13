@@ -80,6 +80,19 @@ def _build_main_parser() -> argparse.ArgumentParser:
         help="disable all output except for errors",
     )
 
+    parser.add_argument(
+        "-w", "--workers",
+        required=False,
+        type=int,
+        default=10,
+        metavar="N",
+        help=(
+            "number of parallel threads for structure downloads (default: 10). "
+            "Increase for faster downloads on large datasets; "
+            "decrease if the AlphaFold API starts rate-limiting."
+        ),
+    )
+
     return parser
 
 def _build_conf_parser() -> argparse.ArgumentParser:

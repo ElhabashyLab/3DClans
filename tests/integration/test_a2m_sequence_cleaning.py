@@ -19,15 +19,15 @@ from Bio import SeqIO
 # Format: (uid, region_start, region_end, a2m_sequence)
 REAL_A2M_ENTRIES = [
     (
-        "A0A2M8UWB6",
+        "A0A239FIU6",
         524,
         595,
-        "..sPQEFASQLAKPLGAKTAQREVEQALRDLHLPFDERRPYALRRLRDRIEANLSGLMGPSVAQDMVESFlpyk"
+        "..sPQEFASQLARPLGAKTAQKEVEQALRDLHLPFDERRPYALRRLRDRIEANLSGLMGPSVAQDMVETFlpyk"
     ),
     (
-        "A0A836ZK00",
-        73,
-        144,
+        "F3FTQ1",
+        139,
+        210,
         "..sPQEFATQLAKPLGAKAAQKEVEQALRDLYLPFDERRPYALRRLRDRIEANLSGLMGPSVAQDMVETFlpyk"
     ),
 ]
