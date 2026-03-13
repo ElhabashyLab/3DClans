@@ -425,8 +425,8 @@ src/clans3d/
 │   └── benchmark_result.py          # Result data class
 └── legacy/                          # CLANS Java headless integration
     ├── utils_old_clans.py           # Headless CLANS & BLAST utilities
-    ├── clans_website_version.jar
-    └── clans_working_version.jar
+    ├── CLANS_website_version.jar    # CLANS software from official website (buggy)
+    └── CLANS.jar                    # CLANS software (not buggy)
 
 evaluation/                          # Analysis & clustering (separate from main package)
 ├── evaluation_src/                  # Evaluation modules
