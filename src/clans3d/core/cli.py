@@ -5,12 +5,15 @@ Provides the argparse setup for the main entry point and the config-file
 pre-parser.
 """
 
+import os
 import sys
 import argparse
 
 from clans3d.core.input_file_type import InputFileType
 from clans3d.core.config_file import ConfigFile
 from clans3d.similarity.tool_type import ToolType
+
+_DEFAULT_OUTPUT_DIR = os.path.join("output", "clans_files")
 
 
 def _build_main_parser() -> argparse.ArgumentParser:
@@ -149,3 +152,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     parser = _build_main_parser()
     return parser.parse_args(merged_argv)
+
+
+def resolve_output_path(out: str | None) -> tuple[str, str | None]:
+    """Resolve the ``-o / --out`` argument into output_dir and output_filename.
+
+    Args:
+        out: The raw value of ``args.out`` (may be ``None``).
+
+    Returns:
+        Tuple of ``(output_dir, output_filename)``.  *output_filename* is
+        ``None`` when only a directory was given or *out* was ``None``.
+    """
+    if out is None:
+        return _DEFAULT_OUTPUT_DIR, None
+
+    basename = os.path.basename(out)
+    _, ext = os.path.splitext(basename)
+    if ext == ".clans":
+        return os.path.dirname(out) or ".", basename
+    return out, None

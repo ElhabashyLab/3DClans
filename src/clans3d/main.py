@@ -1,9 +1,8 @@
 import logging
-import os
 import sys
 from clans3d.similarity.tool_type import ToolType
 from clans3d.core.input_file_type import InputFileType
-from clans3d.core.cli import parse_args
+from clans3d.core.cli import parse_args, resolve_output_path
 from clans3d.core.pipeline import ClansPipeline, PipelineConfig
 from clans3d.utils.dependency_checks import verify_tool_dependencies
 from clans3d.utils.log import setup_logging
@@ -18,18 +17,7 @@ def main():
 
     verify_tool_dependencies(ToolType(args.tool))
 
-    # Resolve optional output path into output_dir and output_filename
-    output_dir = os.path.join("output", "clans_files")
-    output_filename = None
-    if args.out is not None:
-        out_path = args.out
-        basename = os.path.basename(out_path)
-        _, ext = os.path.splitext(basename)
-        if ext == ".clans":
-            output_dir = os.path.dirname(out_path) or "."
-            output_filename = basename
-        else:
-            output_dir = out_path
+    output_dir, output_filename = resolve_output_path(args.out)
 
     config = PipelineConfig(
         input_file=args.load,

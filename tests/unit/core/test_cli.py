@@ -1,7 +1,7 @@
-"""Unit tests for clans3d.core.cli.parse_args."""
+"""Unit tests for clans3d.core.cli.parse_args and resolve_output_path."""
 import os
 import pytest
-from clans3d.core.cli import parse_args
+from clans3d.core.cli import parse_args, resolve_output_path
 
 
 @pytest.fixture
@@ -99,3 +99,30 @@ class TestParseArgs:
             "-o", "/tmp/from_cli.clans", "-c", str(conf),
         ])
         assert args.out == "/tmp/from_cli.clans"
+
+
+class TestResolveOutputPath:
+    def test_none_returns_default(self):
+        output_dir, output_filename = resolve_output_path(None)
+        assert output_dir == os.path.join("output", "clans_files")
+        assert output_filename is None
+
+    def test_clans_file_path(self):
+        output_dir, output_filename = resolve_output_path("/tmp/results/my_output.clans")
+        assert output_dir == "/tmp/results"
+        assert output_filename == "my_output.clans"
+
+    def test_clans_file_without_dir(self):
+        output_dir, output_filename = resolve_output_path("my_output.clans")
+        assert output_dir == "."
+        assert output_filename == "my_output.clans"
+
+    def test_directory_path(self):
+        output_dir, output_filename = resolve_output_path("/tmp/results/")
+        assert output_dir == "/tmp/results/"
+        assert output_filename is None
+
+    def test_directory_without_trailing_slash(self):
+        output_dir, output_filename = resolve_output_path("/tmp/results")
+        assert output_dir == "/tmp/results"
+        assert output_filename is None
