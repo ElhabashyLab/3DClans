@@ -6,6 +6,18 @@ All commands below assume you are in the project root and the virtual environmen
 
 ## Running Tests
 
+### Run all tests (unit + integration + regression + e2e when selected)
+
+```bash
+pytest tests/
+```
+
+### Run all tests except e2e
+
+```bash
+pytest tests/ -m "not e2e"
+```
+
 ### Run all unit tests
 
 ```bash
@@ -51,6 +63,9 @@ Unit tests live in `tests/unit/` and are organized to mirror the `src/clans3d/` 
 | `TestDownloadFastaRecord`                | Correct record is fetched from a mocked HTTP endpoint                                                  |
 | `TestRemoveNonExistingUniprotAccessions` | Filters out accessions absent from a mocked UniProt response                                           |
 | `TestGenerateFastaFromUidsWithRegions`   | Generates FASTA lines with region annotations from a UID/region mapping                                |
+| `TestCleanAlignedSequence`               | Removes alignment gap chars (`.` and `-`), preserves lowercase insertions, uppercases output           |
+| `TestGenerateFastaFromAlignmentFile`     | Generates cleaned FASTA from A2M/A3M-style alignments, handles invalid headers and empty inputs         |
+| `TestCleanedSequenceMatchesRegionLength` | Ensures cleaned sequence lengths match requested region spans across representative cases                |
 
 ### `utils/api_utils.py` — `tests/unit/utils/test_api_utils.py`
 
@@ -91,6 +106,7 @@ Unit tests live in `tests/unit/` and are organized to mirror the `src/clans3d/` 
 | `TestFetchAlphafoldCifUrl`       | Mocked API returns correct CIF URL; missing entry returns `None`                                          |
 | `TestDownloadAlphafoldStructure` | File written on success; returns `False` on API error; region extraction called only when region provided |
 | `TestFetchStructures`            | Dispatches to correct handler for FASTA/A2M/TSV; raises `ValueError` for unsupported type                 |
+| `TestRunDownloadTasks`           | Parallel download task behavior: successful-result filtering, worker count usage, exception propagation   |
 | `TestExtractRegionOfProtein`     | Output CIF contains only residues within the specified range                                              |
 
 ### `core/clans_file.py` — `tests/unit/core/test_clans_file.py`
@@ -198,6 +214,16 @@ Integration tests live in `tests/integration/` and verify that pipeline componen
 ```bash
 pytest tests/integration/
 ```
+
+### `tests/integration/test_a2m_sequence_cleaning.py`
+
+Validates region-based cleaning against known UniProt regions and confirms lowercase residues are treated as real amino acids (not removed as gaps).
+
+| Class                               | What is verified                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| `TestCleanedSequenceMatchesUniProt` | Cleaned extracted sequence matches expected UniProt region content and length    |
+| `TestRealA2MFileAgainstUniProt`     | Real fixture A2M entries match expected UniProt-derived cleaned sequences         |
+| `TestLowercaseAreRealResidues`      | Lowercase letters are preserved as residues; removing them would lose information |
 
 ### `tests/integration/test_pipeline_mocked.py` — `TestPipelineMocked` (FASTA input)
 
