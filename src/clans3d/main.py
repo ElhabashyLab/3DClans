@@ -23,9 +23,11 @@ def main():
     output_filename = None
     if args.out is not None:
         out_path = args.out
-        if out_path.endswith(".clans"):
+        basename = os.path.basename(out_path)
+        _, ext = os.path.splitext(basename)
+        if ext == ".clans":
             output_dir = os.path.dirname(out_path) or "."
-            output_filename = os.path.basename(out_path)
+            output_filename = basename
         else:
             output_dir = out_path
 
