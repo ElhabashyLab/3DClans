@@ -38,6 +38,23 @@ class TestPipelineConfigDefaults:
         )
         assert "clans_files" in config.output_dir
 
+    def test_default_output_filename_is_none(self, fasta_path):
+        config = PipelineConfig(
+            input_file=fasta_path,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+        )
+        assert config.output_filename is None
+
+    def test_custom_output_filename(self, fasta_path):
+        config = PipelineConfig(
+            input_file=fasta_path,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+            output_filename="custom.clans",
+        )
+        assert config.output_filename == "custom.clans"
+
 
 class TestClansPipelineValidate:
     def test_raises_file_not_found(self, tmp_path):

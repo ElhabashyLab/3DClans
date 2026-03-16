@@ -81,6 +81,19 @@ def _build_main_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "-o", "--out",
+        required=False,
+        type=str,
+        default=None,
+        help=(
+            "output path for the generated CLANS file. "
+            "Can be a full file path (e.g. results/my_output.clans) "
+            "or a directory (e.g. results/). "
+            "When omitted the file is written to output/clans_files/."
+        ),
+    )
+
+    parser.add_argument(
         "-w", "--workers",
         required=False,
         type=int,

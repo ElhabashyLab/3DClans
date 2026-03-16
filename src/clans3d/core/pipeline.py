@@ -46,6 +46,8 @@ class PipelineConfig:
         cleaned_input_storage: Directory for cleaned/intermediate input files.
         tool_working_dir: Base directory for similarity tool working files.
         download_workers: Maximum number of concurrent structure download threads. Default is 10.
+        output_filename: Optional custom filename for the CLANS file.
+            If ``None``, the name is derived from the cleaned FASTA basename.
     """
 
     def __init__(
@@ -61,6 +63,7 @@ class PipelineConfig:
         cleaned_input_storage: str = os.path.join("work", "cleaned_input_storage"),
         tool_working_dir: str = "work",
         download_workers: int = 10,
+        output_filename: str | None = None,
     ):
         self.input_file = input_file
         self.input_type = input_type
@@ -73,6 +76,7 @@ class PipelineConfig:
         self.cleaned_input_storage = cleaned_input_storage
         self.tool_working_dir = tool_working_dir
         self.download_workers = download_workers
+        self.output_filename = output_filename
 
 
 class ClansPipeline:
@@ -239,5 +243,7 @@ class ClansPipeline:
         uids_with_regions = self.fetch_structures()
         cleaned_fasta_path = self.generate_cleaned_fasta(uids_with_regions)
         scores = self.compute_scores(self.config.structures_dir)
-        clans_file_path = self.generate_clans_file(scores, cleaned_fasta_path)
+        clans_file_path = self.generate_clans_file(
+            scores, cleaned_fasta_path, output_filename=self.config.output_filename,
+        )
         return clans_file_path, cleaned_fasta_path

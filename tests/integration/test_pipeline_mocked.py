@@ -122,6 +122,29 @@ class TestPipelineMocked:
             with pytest.raises(RuntimeError, match="No structures"):
                 pipeline.run()
 
+    def test_run_with_custom_output_filename(self, tmp_path):
+        config = PipelineConfig(
+            input_file=SMALL_FASTA,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+            structures_dir=str(tmp_path / "structures"),
+            output_dir=str(tmp_path / "custom_output"),
+            cleaned_input_storage=str(tmp_path / "cleaned"),
+            output_filename="my_results.clans",
+        )
+        custom_pipeline = ClansPipeline(config)
+        with (
+            patch(
+                "clans3d.core.pipeline.fetch_structures",
+                return_value=MOCK_UIDS_WITH_REGIONS,
+            ),
+            patch("clans3d.core.pipeline.StructSimComputer") as MockComputer,
+        ):
+            MockComputer.return_value.run.return_value = MOCK_SCORES
+            clans_path, _ = custom_pipeline.run()
+        assert os.path.isfile(clans_path)
+        assert clans_path == os.path.join(str(tmp_path / "custom_output"), "my_results.clans")
+
 
 class TestPipelineMockedTSV:
     """Integration tests for the TSV input path.

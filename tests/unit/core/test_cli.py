@@ -63,3 +63,39 @@ class TestParseArgs:
             "-s", "TM", "-c", str(conf),
         ])
         assert args.score == "TM"
+
+    def test_default_out_is_none(self, fasta_path):
+        args = parse_args(["-l", fasta_path, "-i", "fasta", "-t", "foldseek"])
+        assert args.out is None
+
+    def test_out_flag_with_file_path(self, fasta_path):
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "-o", "/tmp/results/my_output.clans",
+        ])
+        assert args.out == "/tmp/results/my_output.clans"
+
+    def test_out_flag_with_directory(self, fasta_path):
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "-o", "/tmp/results/",
+        ])
+        assert args.out == "/tmp/results/"
+
+    def test_out_flag_from_config_file(self, fasta_path, tmp_path):
+        conf = tmp_path / "test.conf"
+        conf.write_text("-out /tmp/from_config.clans\n")
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "-c", str(conf),
+        ])
+        assert args.out == "/tmp/from_config.clans"
+
+    def test_cli_out_overrides_config_out(self, fasta_path, tmp_path):
+        conf = tmp_path / "test.conf"
+        conf.write_text("-out /tmp/from_config.clans\n")
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "-o", "/tmp/from_cli.clans", "-c", str(conf),
+        ])
+        assert args.out == "/tmp/from_cli.clans"

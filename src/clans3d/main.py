@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from clans3d.similarity.tool_type import ToolType
 from clans3d.core.input_file_type import InputFileType
@@ -17,6 +18,17 @@ def main():
 
     verify_tool_dependencies(ToolType(args.tool))
 
+    # Resolve optional output path into output_dir and output_filename
+    output_dir = os.path.join("output", "clans_files")
+    output_filename = None
+    if args.out is not None:
+        out_path = args.out
+        if out_path.endswith(".clans"):
+            output_dir = os.path.dirname(out_path) or "."
+            output_filename = os.path.basename(out_path)
+        else:
+            output_dir = out_path
+
     config = PipelineConfig(
         input_file=args.load,
         input_type=InputFileType(args.input_type),
@@ -25,6 +37,8 @@ def main():
         verbose=args.verbose,
         quiet=args.quiet,
         download_workers=args.workers,
+        output_dir=output_dir,
+        output_filename=output_filename,
     )
     pipeline = ClansPipeline(config)
     try:
