@@ -57,7 +57,7 @@ Input File (FASTA / A2M / A3M / TSV)
 3. **Pairwise similarity** — Runs an all-vs-all structural comparison using Foldseek (fast, E-value or TM-score) or USalign (slower, TM-score). This produces `n*(n-1)/2` pairwise scores.
 4. **CLANS file generation** — Writes a CLANS-format file containing the sequences, pairwise scores, and initial random 3D coordinates for visualization.
 
-The output `.clans` file can be opened directly in the [CLANS Java application](https://www.eb.tuebingen.mpg.de/protein-evolution/software/clans/) for interactive 2D/3D clustering.
+The output `.clans` file can be opened directly with one of the bundled CLANS JAR files in `src/clans3d/legacy/` (for example, `clans_working_version.jar`) for interactive 2D/3D clustering.
 
 ---
 
@@ -73,13 +73,15 @@ The output `.clans` file can be opened directly in the [CLANS Java application](
 
 ### Installing Foldseek
 
-Download from [https://mmseqs.com/foldseek](https://mmseqs.com/foldseek). Not available on Windows.
+Download with:
 
 | Platform      | Command                                                                                                    |
 | ------------- | ---------------------------------------------------------------------------------------------------------- |
 | Linux (AVX2)  | `wget https://mmseqs.com/foldseek/foldseek-linux-avx2.tar.gz && tar xvzf foldseek-linux-avx2.tar.gz`       |
 | Linux (ARM64) | `wget https://mmseqs.com/foldseek/foldseek-linux-arm64.tar.gz && tar xvzf foldseek-linux-arm64.tar.gz`     |
 | macOS         | `wget https://mmseqs.com/foldseek/foldseek-osx-universal.tar.gz && tar xvzf foldseek-osx-universal.tar.gz` |
+
+other foldseek binaries can be found at [https://mmseqs.com/foldseek](https://mmseqs.com/foldseek).
 
 ### Installing USalign
 
