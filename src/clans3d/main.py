@@ -2,7 +2,7 @@ import logging
 import sys
 from clans3d.similarity.tool_type import ToolType
 from clans3d.core.input_file_type import InputFileType
-from clans3d.core.cli import parse_args
+from clans3d.core.cli import parse_args, resolve_output_path
 from clans3d.core.pipeline import ClansPipeline, PipelineConfig
 from clans3d.utils.dependency_checks import verify_tool_dependencies
 from clans3d.utils.log import setup_logging
@@ -17,6 +17,8 @@ def main():
 
     verify_tool_dependencies(ToolType(args.tool))
 
+    output_dir, output_filename = resolve_output_path(args.out)
+
     config = PipelineConfig(
         input_file=args.load,
         input_type=InputFileType(args.input_type),
@@ -25,6 +27,8 @@ def main():
         verbose=args.verbose,
         quiet=args.quiet,
         download_workers=args.workers,
+        output_dir=output_dir,
+        output_filename=output_filename,
     )
     pipeline = ClansPipeline(config)
     try:

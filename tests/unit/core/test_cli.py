@@ -1,7 +1,7 @@
-"""Unit tests for clans3d.core.cli.parse_args."""
+"""Unit tests for clans3d.core.cli.parse_args and resolve_output_path."""
 import os
 import pytest
-from clans3d.core.cli import parse_args
+from clans3d.core.cli import parse_args, resolve_output_path
 
 
 @pytest.fixture
@@ -63,3 +63,66 @@ class TestParseArgs:
             "-s", "TM", "-c", str(conf),
         ])
         assert args.score == "TM"
+
+    def test_default_out_is_none(self, fasta_path):
+        args = parse_args(["-l", fasta_path, "-i", "fasta", "-t", "foldseek"])
+        assert args.out is None
+
+    def test_out_flag_with_file_path(self, fasta_path):
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "-o", "/tmp/results/my_output.clans",
+        ])
+        assert args.out == "/tmp/results/my_output.clans"
+
+    def test_out_flag_with_directory(self, fasta_path):
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "-o", "/tmp/results/",
+        ])
+        assert args.out == "/tmp/results/"
+
+    def test_out_flag_from_config_file(self, fasta_path, tmp_path):
+        conf = tmp_path / "test.conf"
+        conf.write_text("-out /tmp/from_config.clans\n")
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "-c", str(conf),
+        ])
+        assert args.out == "/tmp/from_config.clans"
+
+    def test_cli_out_overrides_config_out(self, fasta_path, tmp_path):
+        conf = tmp_path / "test.conf"
+        conf.write_text("-out /tmp/from_config.clans\n")
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "-o", "/tmp/from_cli.clans", "-c", str(conf),
+        ])
+        assert args.out == "/tmp/from_cli.clans"
+
+
+class TestResolveOutputPath:
+    def test_none_returns_default(self):
+        output_dir, output_filename = resolve_output_path(None)
+        assert output_dir == os.path.join("output", "clans_files")
+        assert output_filename is None
+
+    def test_clans_file_path(self):
+        output_dir, output_filename = resolve_output_path("/tmp/results/my_output.clans")
+        assert output_dir == "/tmp/results"
+        assert output_filename == "my_output.clans"
+
+    def test_clans_file_without_dir(self):
+        output_dir, output_filename = resolve_output_path("my_output.clans")
+        assert output_dir == "."
+        assert output_filename == "my_output.clans"
+
+    def test_directory_path(self):
+        output_dir, output_filename = resolve_output_path("/tmp/results/")
+        assert output_dir == "/tmp/results/"
+        assert output_filename is None
+
+    def test_directory_without_trailing_slash(self):
+        output_dir, output_filename = resolve_output_path("/tmp/results")
+        assert output_dir == "/tmp/results"
+        assert output_filename is None

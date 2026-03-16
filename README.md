@@ -180,6 +180,7 @@ clans3d -l <INPUT_FILE> -i <INPUT_TYPE> -t <TOOL> [OPTIONS]
 
 | Argument              | Description                                                                    |
 | --------------------- | ------------------------------------------------------------------------------ |
+| `-o, --out <PATH>`    | Output path for the CLANS file (file path or directory; default: `output/clans_files/`) |
 | `-s, --score <SCORE>` | Foldseek score type: `evalue` (default) or `TM`. Only valid with `-t foldseek` |
 | `-c, --conf <PATH>`   | Configuration file (CLI arguments override config values)                      |
 | `-w, --workers <N>`   | Number of parallel threads for structure downloads (default: `10`)             |
@@ -228,6 +229,7 @@ Configuration files use the format `-key value`, one per line:
 -tool foldseek
 -score evalue
 -workers 20
+-out results/my_output.clans
 -verbose
 ```
 
@@ -281,6 +283,16 @@ clans3d -l proteins.fasta -i fasta -t foldseek -w 30
 
 Use higher values on fast networks for large inputs. If the AlphaFold API rate-limits requests, reduce the value.
 
+#### Custom output path
+
+```bash
+# Write to a specific file
+clans3d -l proteins.fasta -i fasta -t foldseek -o results/my_output.clans
+
+# Write to a directory (filename auto-derived from input)
+clans3d -l proteins.fasta -i fasta -t foldseek -o results/
+```
+
 ### Output
 
 After a successful run, the following files are produced:
@@ -298,6 +310,8 @@ work/
 │   └── ...
 └── foldseek/  (or usalign/)       # Tool working files
 ```
+
+Use `-o / --out` to change the output location. A path ending in `.clans` is treated as a file path; any other path is treated as a directory (the filename is derived from the input file name).
 
 The cleaned FASTA file contains only the proteins for which structures were successfully downloaded. The CLANS file contains all pairwise structural similarity scores and can be opened in the CLANS Java application for interactive clustering.
 

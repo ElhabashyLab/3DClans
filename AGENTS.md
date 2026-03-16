@@ -216,6 +216,7 @@ clans3d -l <INPUT_FILE> -i <INPUT_TYPE> -t <TOOL> [OPTIONS]
 | `-l / --load` | any path | path to the input file |
 | `-i / --input_type` | `fasta` `a2m` `a3m` `tsv` | must match file extension |
 | `-t / --tool` | `foldseek` `USalign` | case-sensitive |
+| `-o / --out` | path | output file path or directory (default `output/clans_files/`) |
 | `-s / --score` | `evalue` `TM` | Foldseek only; default `evalue` |
 | `-c / --conf` | path | config file; CLI args override config |
 | `-w / --workers` | int | parallel download threads (default 10) |
@@ -237,6 +238,10 @@ clans3d -l examples/small_fasta_files/5.fasta -i fasta -t USalign
 # TSV input
 clans3d -l examples/small_tsv_files/5.tsv -i tsv -t foldseek
 
+# Custom output path (file or directory)
+clans3d -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -o results/my_output.clans
+clans3d -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -o results/
+
 # Config file
 clans3d -c examples/config_files/example.conf
 ```
@@ -252,6 +257,8 @@ config = PipelineConfig(
     input_file="examples/small_fasta_files/5.fasta",
     input_type=InputFileType.FASTA,
     tool=ToolType.FOLDSEEK,
+    output_dir="results",
+    output_filename="my_output.clans",
 )
 pipeline = ClansPipeline(config)
 clans_path, fasta_path = pipeline.run()
@@ -423,6 +430,18 @@ dict[str, tuple[int, int] | None]
 1. Add the argument to `_build_main_parser()` in `core/cli.py`.
 2. Add the corresponding attribute to `PipelineConfig` in `core/pipeline.py`.
 3. Pass the value through `main()` in `main.py`.
+4. Update documentation (see [Documentation updates](#documentation-updates) below).
+
+### Documentation updates
+
+**Every user-facing change must be reflected in the documentation.** After implementing any feature, bug fix, or behavioral change, check and update the following files as needed:
+
+- **`README.md`** — CLI argument tables, usage examples, output descriptions, configuration file examples.
+- **`AGENTS.md`** — CLI usage table (section 5), examples, pipeline-as-a-library snippets, "Adding New Features" checklists.
+- **`docs/TESTING_GUIDE.md`** — if new test files or test classes were added.
+- **`docs/BENCHMARK_USAGE.md`** — if benchmark behavior or output changed.
+
+When in doubt, update the docs. Outdated documentation is worse than missing documentation.
 
 ---
 
