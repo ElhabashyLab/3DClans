@@ -118,3 +118,29 @@ class TestFetchStructures:
              patch("os.makedirs"):
             result = pipeline.fetch_structures()
         assert result == expected
+
+
+class TestGenerateCleanedFastaTSV:
+    def test_forwards_download_workers_to_tsv_fasta_generation(self, tsv_path, tmp_path):
+        config = PipelineConfig(
+            input_file=tsv_path,
+            input_type=InputFileType.TSV,
+            tool=ToolType.FOLDSEEK,
+            cleaned_input_storage=str(tmp_path / "cleaned"),
+            download_workers=7,
+        )
+        pipeline = ClansPipeline(config)
+
+        uids_with_regions = {"P11111": None}
+        expected_path = str(tmp_path / "cleaned" / "input_cleaned.fasta")
+
+        with patch("os.makedirs"), \
+             patch("clans3d.core.pipeline.generate_fasta_from_uids_with_regions", return_value=expected_path) as mock_generate:
+            result = pipeline.generate_cleaned_fasta(uids_with_regions)
+
+        assert result == expected_path
+        mock_generate.assert_called_once_with(
+            uids_with_regions,
+            expected_path,
+            max_workers=7,
+        )

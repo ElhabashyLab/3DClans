@@ -11,13 +11,9 @@ from Bio.PDB.PDBIO import Select
 from clans3d.core.input_file_type import InputFileType
 from clans3d.utils.file_utils import download_file, reset_dir_content
 from clans3d.utils.fasta_utils import extract_uid_from_recordID, extract_region_from_record
+from clans3d.utils.log import _log_interval
 
 logger = logging.getLogger(__name__)
-
-
-def _log_interval(total: int) -> int:
-    """Return how often to log progress: every 10 items or every 20%, whichever is smaller."""
-    return max(1, min(10, total // 5))
 
 
 def _parse_region_from_tsv_row(row: pd.Series) -> tuple[int, int] | None:
