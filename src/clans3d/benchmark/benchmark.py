@@ -35,7 +35,7 @@ class Benchmark:
     """
     
     def __init__(self, input_file: str, input_file_type: InputFileType, 
-                 output_dir: str = "benchmark_output"):
+                 output_dir: str = "benchmark_output", num_workers: int = 10):
         """
         Initialize benchmark with input file.
         
@@ -46,6 +46,7 @@ class Benchmark:
             input_file: Path to input file (FASTA, A2M, or TSV format)
             input_file_type: Type of input file
             output_dir: Directory for benchmark outputs (default: "benchmark_output")
+            num_workers: Number of parallel workers for structure download (default: 10)
         """
         if not os.path.exists(input_file):
             raise FileNotFoundError(f"Input file not found: {input_file}")
@@ -53,6 +54,7 @@ class Benchmark:
         self.input_file = input_file
         self.input_file_type = input_file_type
         self.output_dir = output_dir
+        self.num_workers = num_workers
         
         # Create timestamped output directory
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -94,6 +96,7 @@ class Benchmark:
             structures_dir=self.structures_dir,
             output_dir=self.clans_dir,
             cleaned_input_storage=self.work_dir,
+            download_workers=self.num_workers
         )
         return ClansPipeline(config)
     
@@ -300,7 +303,7 @@ if __name__ == "__main__":
     input_type = InputFileType.TSV
     
     # Run benchmark
-    benchmark = Benchmark(input_file, input_type)
+    benchmark = Benchmark(input_file, input_type, num_workers=50)
     df = benchmark.run_all_tools()
     
     # Display results

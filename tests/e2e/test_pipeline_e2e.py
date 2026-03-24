@@ -155,6 +155,8 @@ class TestCliEntrypoint:
     def test_cli_exits_with_zero(self, tmp_path):
         if not shutil.which("foldseek"):
             pytest.skip("foldseek not in PATH")
+        if not shutil.which("3dclans"):
+            pytest.skip("3dclans not in PATH")
         result = subprocess.run(
             [
                 "3dclans",
