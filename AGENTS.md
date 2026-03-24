@@ -1,4 +1,4 @@
-# AGENTS.md — Clans-3D Agent Guide
+# AGENTS.md — 3DClans Agent Guide
 
 This file is the primary reference for AI coding agents working in this repository.
 Read it **before** making any changes.
@@ -7,7 +7,7 @@ Read it **before** making any changes.
 
 ## Table of Contents
 
-1. [What is Clans-3D?](#1-what-is-clans-3d)
+1. [What is 3DClans?](#1-what-is-3dclans)
 2. [Repository Layout](#2-repository-layout)
 3. [Environment Setup](#3-environment-setup)
 4. [Running Tests](#4-running-tests)
@@ -21,9 +21,9 @@ Read it **before** making any changes.
 
 ---
 
-## 1. What is Clans-3D?
+## 1. What is 3DClans?
 
-Clans-3D generates [CLANS](https://www.eb.tuebingen.mpg.de/protein-evolution/software/clans/) visualization files from protein structures using **pairwise structural similarity** scores rather than sequence-based BLAST scores.
+3DClans generates [CLANS](https://www.eb.tuebingen.mpg.de/protein-evolution/software/clans/) visualization files from protein structures using **pairwise structural similarity** scores rather than sequence-based BLAST scores.
 
 **Data flow:**
 
@@ -50,7 +50,7 @@ The output `.clans` file can be opened in the bundled CLANS Java application for
 ## 2. Repository Layout
 
 ```
-Clans-3D/
+3DClans/
 ├── AGENTS.md                         # ← you are here
 ├── README.md
 ├── pyproject.toml                    # packaging, deps, pytest config, coverage config
@@ -125,8 +125,8 @@ Clans-3D/
 ### Install (development mode)
 
 ```bash
-git clone https://github.com/ElhabashyLab/Clans-3D.git
-cd Clans-3D
+git clone https://github.com/ElhabashyLab/3DClans.git
+cd 3DClans
 
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
@@ -134,12 +134,12 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"            # installs package + pytest, pytest-cov
 ```
 
-> `pip install -e ".[dev]"` is required so that `import clans3d` resolves from `src/` and the `clans3d` CLI command is available.
+> `pip install -e ".[dev]"` is required so that `import clans3d` resolves from `src/` and the `3dclans` CLI command is available.
 
 ### Verify the install
 
 ```bash
-clans3d -h          # should print the CLI help
+3dclans -h          # should print the CLI help
 
 python -c "import clans3d; print('ok')"
 
@@ -208,7 +208,7 @@ See [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) for a full table of what ea
 ## 5. CLI Usage
 
 ```
-clans3d -l <INPUT_FILE> -i <INPUT_TYPE> -t <TOOL> [OPTIONS]
+3dclans -l <INPUT_FILE> -i <INPUT_TYPE> -t <TOOL> [OPTIONS]
 ```
 
 | Argument | Values | Notes |
@@ -227,23 +227,23 @@ clans3d -l <INPUT_FILE> -i <INPUT_TYPE> -t <TOOL> [OPTIONS]
 
 ```bash
 # Foldseek with default E-value scoring
-clans3d -l examples/small_fasta_files/5.fasta -i fasta -t foldseek
+3dclans -l examples/small_fasta_files/5.fasta -i fasta -t foldseek
 
 # Foldseek with TM-score
-clans3d -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -s TM
+3dclans -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -s TM
 
 # USalign
-clans3d -l examples/small_fasta_files/5.fasta -i fasta -t USalign
+3dclans -l examples/small_fasta_files/5.fasta -i fasta -t USalign
 
 # TSV input
-clans3d -l examples/small_tsv_files/5.tsv -i tsv -t foldseek
+3dclans -l examples/small_tsv_files/5.tsv -i tsv -t foldseek
 
 # Custom output path (file or directory)
-clans3d -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -o results/my_output.clans
-clans3d -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -o results/
+3dclans -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -o results/my_output.clans
+3dclans -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -o results/
 
 # Config file
-clans3d -c examples/config_files/example.conf
+3dclans -c examples/config_files/example.conf
 ```
 
 ### Pipeline as a library

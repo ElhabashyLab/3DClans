@@ -1,7 +1,7 @@
 """
-Benchmark module for Clans-3D structural similarity tools.
+Benchmark module for 3DClans structural similarity tools.
 
-This module provides comprehensive benchmarking of the full Clans-3D pipeline,
+This module provides comprehensive benchmarking of the full 3DClans pipeline,
 measuring timing for structure download, score computation, and CLANS file generation.
 
 Supported tools:
@@ -24,7 +24,7 @@ from clans3d.core.input_file_type import InputFileType
 
 class Benchmark:
     """
-    Benchmark class for measuring performance of Clans-3D structural similarity tools.
+    Benchmark class for measuring performance of 3DClans structural similarity tools.
     
     This class wraps :class:`ClansPipeline` and times each pipeline step
     independently for detailed performance analysis.
@@ -105,7 +105,7 @@ class Benchmark:
             pd.DataFrame: Results as a pandas DataFrame
         """
         print(f"\n{'='*80}")
-        print(f"Starting Clans-3D Benchmark")
+        print(f"Starting 3DClans Benchmark")
         print(f"{'='*80}")
         print(f"Input file: {self.input_file}")
         print(f"Input type: {self.input_file_type.value}")

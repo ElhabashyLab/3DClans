@@ -1,5 +1,5 @@
 """
-CLI argument parsing for Clans-3D.
+CLI argument parsing for 3DClans.
 
 Provides the argparse setup for the main entry point and the config-file
 pre-parser.

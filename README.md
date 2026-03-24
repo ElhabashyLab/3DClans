@@ -1,4 +1,4 @@
-# Clans-3D
+# 3DClans
 
 ## Table of Contents
 
@@ -26,11 +26,11 @@
 
 ---
 
-**Clans-3D** generates [CLANS](https://www.eb.tuebingen.mpg.de/protein-evolution/software/clans/) visualization files from protein structures using pairwise structural similarity scores. Instead of relying on sequence-based BLAST scores like the original CLANS tool, Clans-3D computes structural similarities with [Foldseek](https://github.com/steineggerlab/foldseek) or [USalign](https://zhanggroup.org/US-align/), enabling structure-aware clustering and visualization of protein families.
+**3DClans** generates [CLANS](https://www.eb.tuebingen.mpg.de/protein-evolution/software/clans/) visualization files from protein structures using pairwise structural similarity scores. Instead of relying on sequence-based BLAST scores like the original CLANS tool, 3DClans computes structural similarities with [Foldseek](https://github.com/steineggerlab/foldseek) or [USalign](https://zhanggroup.org/US-align/), enabling structure-aware clustering and visualization of protein families.
 
 ## How It Works
 
-Clans-3D automates the full pipeline from a list of proteins to a ready-to-visualize CLANS file:
+3DClans automates the full pipeline from a list of proteins to a ready-to-visualize CLANS file:
 
 ```
 Input File (FASTA / A2M / A3M / TSV)
@@ -104,7 +104,7 @@ g++ -static -O3 -ffast-math -o USalign USalign.cpp   # Remove -static on macOS
 
 ### Adding tools to your PATH
 
-Clans-3D needs `foldseek` and/or `USalign` to be on your system PATH:
+3DClans needs `foldseek` and/or `USalign` to be on your system PATH:
 
 **Linux / macOS:**
 
@@ -127,11 +127,11 @@ source ~/.bashrc
 4. Click **New** and add the folder containing `USalign.exe`
 5. Click OK and restart your terminal
 
-### Install Clans-3D from source
+### Install 3DClans from source
 
 ```bash
-git clone https://github.com/ElhabashyLab/Clans-3D.git
-cd Clans-3D
+git clone https://github.com/ElhabashyLab/3DClans.git
+cd 3DClans
 
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
@@ -139,7 +139,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install .
 ```
 
-This installs the `clans3d` command-line tool. To also install development/test dependencies:
+This installs the `3dclans` command-line tool. To also install development/test dependencies:
 
 ```bash
 pip install -e ".[dev]"
@@ -149,7 +149,7 @@ pip install -e ".[dev]"
 
 ```bash
 # Check that the CLI is available
-clans3d -h
+3dclans -h
 
 # Check that external tools are found
 which foldseek
@@ -165,7 +165,7 @@ Get-Command USalign # Windows (PowerShell)
 ### Command-Line Interface
 
 ```
-clans3d -l <INPUT_FILE> -i <INPUT_TYPE> -t <TOOL> [OPTIONS]
+3dclans -l <INPUT_FILE> -i <INPUT_TYPE> -t <TOOL> [OPTIONS]
 ```
 
 #### Required arguments
@@ -233,7 +233,7 @@ Configuration files use the format `-key value`, one per line:
 -verbose
 ```
 
-Use with: `clans3d -c config.conf`
+Use with: `3dclans -c config.conf`
 
 CLI arguments override any values set in the config file.
 
@@ -242,43 +242,43 @@ CLI arguments override any values set in the config file.
 #### Basic usage with Foldseek (E-value scores)
 
 ```bash
-clans3d -l proteins.fasta -i fasta -t foldseek
+3dclans -l proteins.fasta -i fasta -t foldseek
 ```
 
 #### Foldseek with TM-score
 
 ```bash
-clans3d -l proteins.fasta -i fasta -t foldseek -s TM
+3dclans -l proteins.fasta -i fasta -t foldseek -s TM
 ```
 
 #### USalign
 
 ```bash
-clans3d -l proteins.fasta -i fasta -t USalign
+3dclans -l proteins.fasta -i fasta -t USalign
 ```
 
 #### A2M alignment input
 
 ```bash
-clans3d -l alignment.a2m -i a2m -t foldseek
+3dclans -l alignment.a2m -i a2m -t foldseek
 ```
 
 #### TSV input
 
 ```bash
-clans3d -l proteins.tsv -i tsv -t foldseek -s evalue
+3dclans -l proteins.tsv -i tsv -t foldseek -s evalue
 ```
 
 #### Verbose output for debugging
 
 ```bash
-clans3d -l proteins.fasta -i fasta -t foldseek -v
+3dclans -l proteins.fasta -i fasta -t foldseek -v
 ```
 
 #### Increase parallel structure downloads
 
 ```bash
-clans3d -l proteins.fasta -i fasta -t foldseek -w 30
+3dclans -l proteins.fasta -i fasta -t foldseek -w 30
 ```
 
 Use higher values on fast networks for large inputs. If the AlphaFold API rate-limits requests, reduce the value.
@@ -287,10 +287,10 @@ Use higher values on fast networks for large inputs. If the AlphaFold API rate-l
 
 ```bash
 # Write to a specific file
-clans3d -l proteins.fasta -i fasta -t foldseek -o results/my_output.clans
+3dclans -l proteins.fasta -i fasta -t foldseek -o results/my_output.clans
 
 # Write to a directory (filename auto-derived from input)
-clans3d -l proteins.fasta -i fasta -t foldseek -o results/
+3dclans -l proteins.fasta -i fasta -t foldseek -o results/
 ```
 
 ### Output
@@ -407,7 +407,7 @@ The evaluation workflow is designed for use in Jupyter notebooks (see `evaluatio
 
 ## Legacy CLANS Integration
 
-Clans-3D includes utilities for running the original CLANS Java application in headless mode, useful for comparing structural similarity results with traditional sequence-based (BLAST) clustering.
+3DClans includes utilities for running the original CLANS Java application in headless mode, useful for comparing structural similarity results with traditional sequence-based (BLAST) clustering.
 
 ```python
 from clans3d.core.config_file import ConfigFile

@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "clans3d"
+name = "3dclans"
 version = "0.1.0"
 description = "Generate CLANS visualization files from protein structures using pairwise structural similarity scores."
 readme = "README.md"
@@ -34,7 +34,7 @@ dev = [
 ]
 
 [project.scripts]
-clans3d = "clans3d.main:main"
+3dclans = "clans3d.main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

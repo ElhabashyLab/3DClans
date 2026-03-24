@@ -1,7 +1,7 @@
 """
-Benchmark module for Clans-3D structural similarity tools.
+Benchmark module for 3DClans structural similarity tools.
 
-This module provides comprehensive benchmarking of the full Clans-3D pipeline,
+This module provides comprehensive benchmarking of the full 3DClans pipeline,
 measuring timing for structure download, score computation, and CLANS file generation.
 """
 

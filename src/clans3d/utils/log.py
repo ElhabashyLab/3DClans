@@ -1,5 +1,5 @@
 """
-Centralized logging configuration for Clans-3D.
+Centralized logging configuration for 3DClans.
 
 Call ``setup_logging()`` once at application start-up (e.g. in ``main()``)
 before any other clans3d imports that emit log messages.
