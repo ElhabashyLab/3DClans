@@ -299,7 +299,7 @@ class Benchmark:
 # example benchmark run
 if __name__ == "__main__":
     # Configuration - edit these values to benchmark different files
-    input_file = "examples/big_tsv_files/500.tsv"
+    input_file = "examples/big_tsv_files/1500.tsv"
     input_type = InputFileType.TSV
     
     # Run benchmark

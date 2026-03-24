@@ -116,7 +116,7 @@ class ClansFile:
         content.append("<param>")
         if self.parameters is not None:
             for key, value in self.parameters.items():
-                content.append(f"-{key} {value}")
+                content.append(f"{key}={value}")
         content.append("</param>")
         return content
 

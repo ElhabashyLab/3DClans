@@ -95,11 +95,17 @@ def _build_main_parser() -> argparse.ArgumentParser:
             "When omitted the file is written to output/clans_files/."
         ),
     )
+    
+    def _positive_int(value):
+        ivalue = int(value)
+        if ivalue <= 0:
+            raise argparse.ArgumentTypeError(f"{value} is not a positive integer")
+        return ivalue
 
     parser.add_argument(
         "-w", "--workers",
         required=False,
-        type=int,
+        type=_positive_int,
         default=10,
         metavar="N",
         help=(
