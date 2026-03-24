@@ -1,4 +1,4 @@
-# Testing Guide for Clans-3D
+# Testing Guide for 3DClans
 
 All commands below assume you are in the project root and the virtual environment is active.
 
@@ -296,5 +296,5 @@ TSV input: `examples/small_tsv_files/5.tsv` (same accessions in TSV format; sequ
 | `TestPipelineFoldseekEvalue` | Foldseek (evalue)   | FASTA | File created, ≥ 3 sequences, ≥ 1 score entry, all sections present |
 | `TestPipelineFoldseekTM`     | Foldseek (TM score) | FASTA | File created, all scores in `[0, 1]`                               |
 | `TestPipelineUSalign`        | USalign             | FASTA | File created, ≥ 3 sequences, ≥ 1 score entry                       |
-| `TestCliEntrypoint`          | Foldseek            | FASTA | `clans3d` subprocess exits with code `0`                           |
+| `TestCliEntrypoint`          | Foldseek            | FASTA | `3dclans` subprocess exits with code `0`                           |
 | `TestPipelineTSVInput`       | Foldseek (evalue)   | TSV   | File created, ≥ 3 sequences, ≥ 1 score entry, cleaned FASTA written |

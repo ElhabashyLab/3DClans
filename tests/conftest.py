@@ -1,5 +1,5 @@
 """
-Shared pytest fixtures for Clans-3D unit tests.
+Shared pytest fixtures for 3DClans unit tests.
 """
 import os
 import pytest
