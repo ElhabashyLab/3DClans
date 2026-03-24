@@ -1,7 +1,7 @@
 """
-Benchmark module for Clans-3D structural similarity tools.
+Benchmark module for 3DClans structural similarity tools.
 
-This module provides comprehensive benchmarking of the full Clans-3D pipeline,
+This module provides comprehensive benchmarking of the full 3DClans pipeline,
 measuring timing for structure download, score computation, and CLANS file generation.
 
 Supported tools:
@@ -24,7 +24,7 @@ from clans3d.core.input_file_type import InputFileType
 
 class Benchmark:
     """
-    Benchmark class for measuring performance of Clans-3D structural similarity tools.
+    Benchmark class for measuring performance of 3DClans structural similarity tools.
     
     This class wraps :class:`ClansPipeline` and times each pipeline step
     independently for detailed performance analysis.
@@ -35,7 +35,7 @@ class Benchmark:
     """
     
     def __init__(self, input_file: str, input_file_type: InputFileType, 
-                 output_dir: str = "benchmark_output"):
+                 output_dir: str = "benchmark_output", num_workers: int = 10):
         """
         Initialize benchmark with input file.
         
@@ -46,6 +46,7 @@ class Benchmark:
             input_file: Path to input file (FASTA, A2M, or TSV format)
             input_file_type: Type of input file
             output_dir: Directory for benchmark outputs (default: "benchmark_output")
+            num_workers: Number of parallel workers for structure download (default: 10)
         """
         if not os.path.exists(input_file):
             raise FileNotFoundError(f"Input file not found: {input_file}")
@@ -53,6 +54,7 @@ class Benchmark:
         self.input_file = input_file
         self.input_file_type = input_file_type
         self.output_dir = output_dir
+        self.num_workers = num_workers
         
         # Create timestamped output directory
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -94,6 +96,7 @@ class Benchmark:
             structures_dir=self.structures_dir,
             output_dir=self.clans_dir,
             cleaned_input_storage=self.work_dir,
+            download_workers=self.num_workers
         )
         return ClansPipeline(config)
     
@@ -105,7 +108,7 @@ class Benchmark:
             pd.DataFrame: Results as a pandas DataFrame
         """
         print(f"\n{'='*80}")
-        print(f"Starting Clans-3D Benchmark")
+        print(f"Starting 3DClans Benchmark")
         print(f"{'='*80}")
         print(f"Input file: {self.input_file}")
         print(f"Input type: {self.input_file_type.value}")
@@ -300,7 +303,7 @@ if __name__ == "__main__":
     input_type = InputFileType.TSV
     
     # Run benchmark
-    benchmark = Benchmark(input_file, input_type)
+    benchmark = Benchmark(input_file, input_type, num_workers=50)
     df = benchmark.run_all_tools()
     
     # Display results

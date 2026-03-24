@@ -155,9 +155,11 @@ class TestCliEntrypoint:
     def test_cli_exits_with_zero(self, tmp_path):
         if not shutil.which("foldseek"):
             pytest.skip("foldseek not in PATH")
+        if not shutil.which("3dclans"):
+            pytest.skip("3dclans not in PATH")
         result = subprocess.run(
             [
-                "clans3d",
+                "3dclans",
                 "-l", SMALL_FASTA,
                 "-i", "fasta",
                 "-t", "foldseek",
@@ -167,7 +169,7 @@ class TestCliEntrypoint:
             cwd=str(tmp_path),  # default output and work dirs go into tmp
         )
         assert result.returncode == 0, (
-            f"clans3d exited with {result.returncode}\n"
+            f"3dclans exited with {result.returncode}\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}"
         )

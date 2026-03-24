@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Clans-3D benchmark provides comprehensive performance analysis of structural similarity tools across the full pipeline:
+The 3DClans benchmark provides comprehensive performance analysis of structural similarity tools across the full pipeline:
 
 1. **Structure Download**: Time to fetch/retrieve protein structures
 2. **Score Computation**: Time for pairwise similarity calculation
@@ -42,7 +42,7 @@ benchmark.export_csv("my_benchmark_results.csv")
 ### Method 2: Run Directly
 
 ```bash
-cd /path/to/Clans-3D
+cd /path/to/3DClans
 python -m clans3d.benchmark.benchmark
 ```
 
