@@ -41,3 +41,13 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
         root.handlers[0].setFormatter(formatter)
     root.setLevel(level)
     root.propagate = False
+    
+
+def _log_interval(total: int) -> int:
+    """Return how often to log progress: every 10 items or every 20%, whichever is smaller.
+    Args:
+        total: Total number of items to process.
+    Returns:
+        int: The interval at which to log progress.
+    """
+    return max(1, min(10, total // 5))

@@ -189,7 +189,9 @@ class ClansPipeline:
             )
         else:  # TSV - download sequences from UniProt
             return generate_fasta_from_uids_with_regions(
-                uids_with_regions, cleaned_path
+                uids_with_regions,
+                cleaned_path,
+                max_workers=self.config.download_workers
             )
 
     def compute_scores(self, structures) -> pd.DataFrame:

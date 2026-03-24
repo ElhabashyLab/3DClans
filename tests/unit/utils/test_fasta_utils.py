@@ -1,5 +1,6 @@
 """Unit tests for clans3d.utils.fasta_utils."""
 import os
+import threading
 import pytest
 import requests
 from io import StringIO
@@ -446,6 +447,33 @@ class TestGenerateFastaFromUidsWithRegions:
             generate_fasta_from_uids_with_regions({}, out)
         records = list(SeqIO.parse(out, "fasta"))
         assert records == []
+
+    def test_preserves_input_order_with_parallel_downloads(self, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        uids = {
+            "P11111": None,
+            "P22222": None,
+        }
+        second_completed = threading.Event()
+
+        def download_side_effect(uid, *args, **kwargs):
+            if uid == "P11111":
+                second_completed.wait(timeout=1.0)
+                return SeqRecord(Seq("ACDE"), id=uid, description="")
+            second_completed.set()
+            return SeqRecord(Seq("FGHI"), id=uid, description="")
+
+        with patch(self.API_MODULE, return_value=self._no_upi(uids)), \
+             patch(f"{MODULE}.download_fasta_record", side_effect=download_side_effect):
+            generate_fasta_from_uids_with_regions(uids, out, max_workers=2)
+
+        records = list(SeqIO.parse(out, "fasta"))
+        assert [record.id for record in records] == ["P11111", "P22222"]
+
+    def test_raises_for_non_positive_max_workers(self, tmp_path):
+        out = str(tmp_path / "out.fasta")
+        with pytest.raises(ValueError, match="max_workers"):
+            generate_fasta_from_uids_with_regions({"P11111": None}, out, max_workers=0)
 
 
 # ---------------------------------------------------------------------------
