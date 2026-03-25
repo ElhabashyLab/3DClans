@@ -178,14 +178,15 @@ Get-Command USalign # Windows (PowerShell)
 
 #### Optional arguments
 
-| Argument              | Description                                                                    |
-| --------------------- | ------------------------------------------------------------------------------ |
-| `-o, --out <PATH>`    | Output path for the CLANS file (file path or directory; default: `output/clans_files/`) |
-| `-s, --score <SCORE>` | Foldseek score type: `evalue` (default) or `TM`. Only valid with `-t foldseek` |
-| `-c, --conf <PATH>`   | Configuration file (CLI arguments override config values)                      |
-| `-w, --workers <N>`   | Number of parallel threads for structure downloads (default: `10`)             |
-| `-v, --verbose`       | Enable debug-level logging                                                     |
-| `-q, --quiet`         | Suppress all output except errors                                              |
+| Argument              | Description                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------- |
+| `-o, --out <PATH>`    | Output path for the CLANS file (file path or directory; default: `output/clans_files/`)           |
+| `-s, --score <SCORE>` | Foldseek score type: `evalue` (default) or `TM`. Only valid with `-t foldseek`                    |
+| `--tm_mode <MODE>`    | TM aggregation mode: `min` (default), `max`, or `mean`. Used by USalign and Foldseek with `-s TM` |
+| `-c, --conf <PATH>`   | Configuration file (CLI arguments override config values)                                         |
+| `-w, --workers <N>`   | Number of parallel threads for structure downloads (default: `10`)                                |
+| `-v, --verbose`       | Enable debug-level logging                                                                        |
+| `-q, --quiet`         | Suppress all output except errors                                                                 |
 
 ### Input File Formats
 
@@ -228,6 +229,7 @@ Configuration files use the format `-key value`, one per line:
 -input_type fasta
 -tool foldseek
 -score evalue
+-tm_mode min
 -workers 20
 -out results/my_output.clans
 -verbose
@@ -249,6 +251,19 @@ CLI arguments override any values set in the config file.
 
 ```bash
 3dclans -l proteins.fasta -i fasta -t foldseek -s TM
+```
+
+#### TM aggregation mode examples
+
+```bash
+# Default (recommended for reducing hub effects): 1 - min(TM1, TM2)
+3dclans -l proteins.fasta -i fasta -t foldseek -s TM --tm_mode min
+
+# Domain-focused matching: 1 - max(TM1, TM2)
+3dclans -l proteins.fasta -i fasta -t foldseek -s TM --tm_mode max
+
+# Balanced compromise: 1 - ((TM1 + TM2) / 2)
+3dclans -l proteins.fasta -i fasta -t USalign --tm_mode mean
 ```
 
 #### USalign

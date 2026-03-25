@@ -4,6 +4,7 @@ from clans3d.similarity.tool_type import ToolType
 from clans3d.core.input_file_type import InputFileType
 from clans3d.core.cli import parse_args, resolve_output_path
 from clans3d.core.pipeline import ClansPipeline, PipelineConfig
+from clans3d.similarity.tm_mode import TmMode
 from clans3d.utils.dependency_checks import verify_tool_dependencies
 from clans3d.utils.log import setup_logging
 
@@ -24,6 +25,7 @@ def main():
         input_type=InputFileType(args.input_type),
         tool=ToolType(args.tool),
         foldseek_score=args.score,
+        tm_mode=TmMode(args.tm_mode),
         verbose=args.verbose,
         quiet=args.quiet,
         download_workers=args.workers,

@@ -2,6 +2,7 @@
 import pytest
 import pandas as pd
 from clans3d.similarity.usalign import USalign
+from clans3d.similarity.tm_mode import TmMode
 
 
 USALIGN_OUTPUT = (
@@ -14,7 +15,17 @@ USALIGN_OUTPUT = (
 
 @pytest.fixture
 def usalign():
-    return USalign()
+    return USalign(tm_mode=TmMode.MIN)
+
+
+@pytest.fixture
+def usalign_max():
+    return USalign(tm_mode=TmMode.MAX)
+
+
+@pytest.fixture
+def usalign_avg():
+    return USalign(tm_mode=TmMode.AVG)
 
 
 class TestCountDataLines:
@@ -43,7 +54,7 @@ class TestParseOutput:
     def test_returns_dataframe_with_correct_columns(self, usalign):
         usalign.output = USALIGN_OUTPUT
         result = usalign._parse_output()
-        assert set(["Sequence_ID_1", "Sequence_ID_2", "score", "TM"]).issubset(result.columns)
+        assert set(["Sequence_ID_1", "Sequence_ID_2", "score"]).issubset(result.columns)
 
     def test_extensions_stripped_from_ids(self, usalign):
         usalign.output = USALIGN_OUTPUT
@@ -51,12 +62,24 @@ class TestParseOutput:
         assert all("." not in uid for uid in result["Sequence_ID_1"])
         assert all("." not in uid for uid in result["Sequence_ID_2"])
 
-    def test_score_is_one_minus_max_tm(self, usalign):
+    def test_score_is_one_minus_min_tm_by_default(self, usalign):
         usalign.output = USALIGN_OUTPUT
         result = usalign._parse_output()
         row = result[result["Sequence_ID_1"] == "P11111"].iloc[0]
-        # TM1=0.75, TM2=0.80 → max=0.80 → score=0.20
+        # TM1=0.75, TM2=0.80 -> min=0.75 -> score=0.25
+        assert row["score"] == pytest.approx(1.0 - 0.75)
+
+    def test_score_is_one_minus_max_tm_when_mode_max(self, usalign_max):
+        usalign_max.output = USALIGN_OUTPUT
+        result = usalign_max._parse_output()
+        row = result[result["Sequence_ID_1"] == "P11111"].iloc[0]
         assert row["score"] == pytest.approx(1.0 - 0.80)
+
+    def test_score_is_one_minus_avg_tm_when_mode_avg(self, usalign_avg):
+        usalign_avg.output = USALIGN_OUTPUT
+        result = usalign_avg._parse_output()
+        row = result[result["Sequence_ID_1"] == "P11111"].iloc[0]
+        assert row["score"] == pytest.approx(1.0 - ((0.75 + 0.80) / 2))
 
     def test_correct_number_of_rows(self, usalign):
         usalign.output = USALIGN_OUTPUT

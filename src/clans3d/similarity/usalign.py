@@ -5,6 +5,7 @@ from io import StringIO
 import pandas as pd
 
 from clans3d.similarity.struct_sim_tool import StructSimTool
+from clans3d.similarity.tm_mode import TmMode
 from clans3d.utils.file_utils import reset_dir_content
 
 logger = logging.getLogger(__name__)
@@ -14,9 +15,20 @@ class USalign(StructSimTool):
     """
     This class extends the StructSimTool class to implement the USalign tool for protein structure comparison.
     """
-    def __init__(self, working_dir: str = os.path.join("work", "usalign")):
+    def __init__(
+        self,
+        tm_mode: TmMode,
+        working_dir: str = os.path.join("work", "usalign")
+    ):
+        """Initialize USalign wrapper.
+
+        Args:
+            tm_mode: TM aggregation mode for combining ``TM1`` and ``TM2``.
+            working_dir: Tool-specific working directory.
+        """
         description = "A tool for protein structure comparison using USalign."
         super().__init__("USalign", description, working_dir)
+        self.tm_mode = tm_mode
         self.flag_dir = "-dir" # specifies the directory containing structure files
         self.flag_outfmt = "-outfmt" # specifies the output format
         self.outfmt_value = "2" # output format 2 is tab-separated with columns: PDBchain1, PDBchain2, TM1, TM2, ...
@@ -98,11 +110,15 @@ class USalign(StructSimTool):
                 raise RuntimeError(f"{self.name} produced empty output.")
             df.columns = [col.lstrip('#') for col in df.columns]
             df1 = df[['PDBchain1', 'PDBchain2', 'TM1', 'TM2']].copy()
-            # take the maximum of TM1 and TM2
-            df1['TM'] = df1[['TM1', 'TM2']].max(axis=1)
+            if self.tm_mode == TmMode.MIN:
+                df1['TM'] = df1[['TM1', 'TM2']].min(axis=1)
+            elif self.tm_mode == TmMode.MAX:
+                df1['TM'] = df1[['TM1', 'TM2']].max(axis=1)
+            else:
+                df1['TM'] = df1[['TM1', 'TM2']].mean(axis=1)
             # transform TM-score to distance metric
             df1["score"] = 1 - df1["TM"]
-            df2 = df1.drop(columns=['TM1', 'TM2'])
+            df2 = df1.drop(columns=['TM1', 'TM2', 'TM'])
             # clean structure names (remove file extensions)
             df2['PDBchain1'] = df2['PDBchain1'].str.split(".").str[0]
             df2['PDBchain2'] = df2['PDBchain2'].str.split(".").str[0]

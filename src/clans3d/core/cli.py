@@ -12,6 +12,7 @@ import argparse
 from clans3d.core.input_file_type import InputFileType
 from clans3d.core.config_file import ConfigFile
 from clans3d.similarity.tool_type import ToolType
+from clans3d.similarity.tm_mode import TmMode
 
 _DEFAULT_OUTPUT_DIR = os.path.join("output", "clans_files")
 
@@ -64,6 +65,18 @@ def _build_main_parser() -> argparse.ArgumentParser:
         choices=["evalue", "TM"],
         default=None,
         help="specifies the scoring method to use for Foldseek (default: evalue)",
+    )
+
+    parser.add_argument(
+        "-m", "--tm_mode",
+        required=False,
+        choices=[m.value for m in TmMode],
+        default=TmMode.MIN.value,
+        help=(
+            "specifies how qtm and ttm are combined into the final distance score: "
+            "min, max, or mean (default: min). "
+            "Used by USalign and Foldseek when -s TM."
+        ),
     )
 
     verbosity = parser.add_mutually_exclusive_group()

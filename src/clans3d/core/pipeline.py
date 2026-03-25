@@ -20,6 +20,7 @@ from clans3d.core.input_file_type import InputFileType
 from clans3d.core.clans_file_generator import ClansFileGenerator
 from clans3d.similarity.struct_sim_computer import StructSimComputer
 from clans3d.similarity.tool_type import ToolType
+from clans3d.similarity.tm_mode import TmMode
 from clans3d.utils.structure_utils import fetch_structures
 from clans3d.utils.fasta_utils import (
     copy_records_from_fasta,
@@ -38,6 +39,8 @@ class PipelineConfig:
         input_file: Path to the input file (FASTA, A2M, or TSV).
         input_type: Format of the input file.
         tool: Structural similarity tool to use.
+        tm_mode: TM aggregation mode used when TM-based scoring is active.
+            Defaults to ``TmMode.MIN``.
         foldseek_score: Score type for Foldseek ("evalue" or "TM"). Ignored for other tools.
         verbose: If ``True``, enable debug-level logging output.
         quiet: If ``True``, suppress all output except errors.  Overrides *verbose*.
@@ -55,6 +58,7 @@ class PipelineConfig:
         input_file: str,
         input_type: InputFileType,
         tool: ToolType,
+        tm_mode: TmMode = TmMode.MIN,
         foldseek_score: str | None = None,
         verbose: bool = False,
         quiet: bool = False,
@@ -69,6 +73,7 @@ class PipelineConfig:
         self.input_type = input_type
         self.tool = tool
         self.foldseek_score = foldseek_score
+        self.tm_mode = tm_mode
         self.verbose = verbose
         self.quiet = quiet
         self.structures_dir = structures_dir
@@ -88,6 +93,7 @@ class ClansPipeline:
             input_file="proteins.fasta",
             input_type=InputFileType.FASTA,
             tool=ToolType.FOLDSEEK,
+            tm_mode=TmMode.MIN,
         )
         pipeline = ClansPipeline(config)
         clans_path, fasta_path = pipeline.run()
@@ -198,6 +204,7 @@ class ClansPipeline:
         foldseek_score = self.config.foldseek_score or "evalue"
         computer = StructSimComputer(
             foldseek_score=foldseek_score,
+            tm_mode=self.config.tm_mode,
             working_dir=self.config.tool_working_dir
         )
         scores = computer.run(self.config.tool, structures)

@@ -19,6 +19,7 @@ import pandas as pd
 from clans3d.benchmark.benchmark_result import BenchmarkResult
 from clans3d.core.pipeline import ClansPipeline, PipelineConfig
 from clans3d.similarity.tool_type import ToolType
+from clans3d.similarity.tm_mode import TmMode
 from clans3d.core.input_file_type import InputFileType
 
 
@@ -34,8 +35,14 @@ class Benchmark:
     any manual preparation.
     """
     
-    def __init__(self, input_file: str, input_file_type: InputFileType, 
-                 output_dir: str = "benchmark_output", num_workers: int = 10):
+    def __init__(
+        self,
+        input_file: str,
+        input_file_type: InputFileType,
+        output_dir: str = "benchmark_output",
+        num_workers: int = 10,
+        tm_mode: TmMode = TmMode.MIN,
+    ):
         """
         Initialize benchmark with input file.
         
@@ -47,6 +54,7 @@ class Benchmark:
             input_file_type: Type of input file
             output_dir: Directory for benchmark outputs (default: "benchmark_output")
             num_workers: Number of parallel workers for structure download (default: 10)
+            tm_mode: TM aggregation mode for TM-score runs (default: min)
         """
         if not os.path.exists(input_file):
             raise FileNotFoundError(f"Input file not found: {input_file}")
@@ -55,6 +63,7 @@ class Benchmark:
         self.input_file_type = input_file_type
         self.output_dir = output_dir
         self.num_workers = num_workers
+        self.tm_mode = tm_mode
         
         # Create timestamped output directory
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -93,6 +102,7 @@ class Benchmark:
             input_type=self.input_file_type,
             tool=tool,
             foldseek_score=score_type,
+            tm_mode=self.tm_mode,
             structures_dir=self.structures_dir,
             output_dir=self.clans_dir,
             cleaned_input_storage=self.work_dir,

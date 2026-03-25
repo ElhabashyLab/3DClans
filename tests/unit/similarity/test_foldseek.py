@@ -4,16 +4,27 @@ import pytest
 import pandas as pd
 from unittest.mock import patch
 from clans3d.similarity.foldseek import Foldseek
+from clans3d.similarity.tm_mode import TmMode
 
 
 @pytest.fixture
 def foldseek_evalue():
-    return Foldseek(score="evalue")
+    return Foldseek(score="evalue", tm_mode=TmMode.MIN)
 
 
 @pytest.fixture
 def foldseek_tm():
-    return Foldseek(score="TM")
+    return Foldseek(score="TM", tm_mode=TmMode.MIN)
+
+
+@pytest.fixture
+def foldseek_tm_max():
+    return Foldseek(score="TM", tm_mode=TmMode.MAX)
+
+
+@pytest.fixture
+def foldseek_tm_avg():
+    return Foldseek(score="TM", tm_mode=TmMode.AVG)
 
 
 # ---------------------------------------------------------------------------
@@ -29,7 +40,7 @@ class TestGetOutputColumns:
 
     def test_invalid_score_raises(self):
         with pytest.raises(ValueError):
-            Foldseek(score="rmsd")
+            Foldseek(score="rmsd", tm_mode=TmMode.MIN)
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +91,7 @@ class TestCleanScoresEvalue:
 # ---------------------------------------------------------------------------
 
 class TestCleanScoresTM:
-    def test_score_is_one_minus_max_tm(self, foldseek_tm):
+    def test_score_is_one_minus_min_tm_by_default(self, foldseek_tm):
         df = pd.DataFrame({
             "Sequence_ID_1": ["A"],
             "Sequence_ID_2": ["B"],
@@ -88,7 +99,27 @@ class TestCleanScoresTM:
             "TM2": [0.9],
         })
         result = foldseek_tm._clean_scores(df)
+        assert result["score"].iloc[0] == pytest.approx(1.0 - 0.7)
+
+    def test_score_is_one_minus_max_tm_when_mode_max(self, foldseek_tm_max):
+        df = pd.DataFrame({
+            "Sequence_ID_1": ["A"],
+            "Sequence_ID_2": ["B"],
+            "TM1": [0.7],
+            "TM2": [0.9],
+        })
+        result = foldseek_tm_max._clean_scores(df)
         assert result["score"].iloc[0] == pytest.approx(1.0 - 0.9)
+
+    def test_score_is_one_minus_avg_tm_when_mode_avg(self, foldseek_tm_avg):
+        df = pd.DataFrame({
+            "Sequence_ID_1": ["A"],
+            "Sequence_ID_2": ["B"],
+            "TM1": [0.7],
+            "TM2": [0.9],
+        })
+        result = foldseek_tm_avg._clean_scores(df)
+        assert result["score"].iloc[0] == pytest.approx(1.0 - 0.8)
 
     def test_tm_columns_removed_from_output(self, foldseek_tm):
         df = pd.DataFrame({
@@ -191,7 +222,7 @@ class TestParseOutputTM:
         (tmp_path / "alignmentFile").write_text("A\tB\t0.5\t0.6\nC\tD\t0.7\t0.9\n")
         with patch("subprocess.run"):
             result = foldseek_tm._parse_output()
-        # max(0.7, 0.9) = 0.9 → score = 1 - 0.9 = 0.1
-        assert result["score"].iloc[0] == pytest.approx(0.1)
+        # default mode is min: min(0.7, 0.9) = 0.7 -> score = 1 - 0.7 = 0.3
+        assert result["score"].iloc[0] == pytest.approx(0.3)
         assert "TM1" not in result.columns
         assert "TM2" not in result.columns

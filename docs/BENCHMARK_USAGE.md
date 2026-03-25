@@ -22,11 +22,13 @@ Structures are downloaded automatically when the `Benchmark` is created, so indi
 ```python
 from clans3d.benchmark import Benchmark
 from clans3d.core.input_file_type import InputFileType
+from clans3d.similarity.tm_mode import TmMode
 
 # Create benchmark instance (downloads structures automatically)
 benchmark = Benchmark(
     input_file="path/to/input_file.fasta",
-    input_file_type=InputFileType.FASTA
+    input_file_type=InputFileType.FASTA,
+    tm_mode=TmMode.MIN,
 )
 
 # Run all tools
@@ -140,13 +142,29 @@ if __name__ == "__main__":
 
 ### Change Output Directory
 
-```python
+````python
 benchmark = Benchmark(
     input_file="input.fasta",
     input_file_type=InputFileType.FASTA,
     output_dir="my_custom_benchmark_dir"  # Custom output directory
 )
-```
+
+### Change TM aggregation mode
+
+For TM-based runs (Foldseek with ``-s TM`` and USalign), benchmark passes
+``tm_mode`` through to the pipeline.
+
+```python
+from clans3d.similarity.tm_mode import TmMode
+
+benchmark = Benchmark(
+    input_file="input.fasta",
+    input_file_type=InputFileType.FASTA,
+    tm_mode=TmMode.MAX,  # or TmMode.AVG (value "mean")
+)
+````
+
+````
 
 ### Run Single Tool
 
@@ -163,7 +181,7 @@ benchmark = Benchmark("input.fasta", InputFileType.FASTA)
 # Run single tool -- no manual download needed
 result = benchmark.run_single_tool(ToolType.FOLDSEEK, "evalue")
 print(f"Foldseek completed in {result.time_total:.2f}s")
-```
+````
 
 ## Additional Resources
 

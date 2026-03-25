@@ -4,32 +4,43 @@ import pandas as pd
 from unittest.mock import MagicMock, patch
 from clans3d.similarity.struct_sim_computer import StructSimComputer
 from clans3d.similarity.tool_type import ToolType
+from clans3d.similarity.tm_mode import TmMode
 from clans3d.similarity.foldseek import Foldseek
 from clans3d.similarity.usalign import USalign
 
 
 class TestCreateTool:
     def test_returns_foldseek_instance(self):
-        computer = StructSimComputer(foldseek_score="evalue")
+        computer = StructSimComputer(tm_mode=TmMode.MIN, foldseek_score="evalue")
         tool = computer._create_tool(ToolType.FOLDSEEK)
         assert isinstance(tool, Foldseek)
 
     def test_returns_usalign_instance(self):
-        computer = StructSimComputer()
+        computer = StructSimComputer(tm_mode=TmMode.MIN)
         tool = computer._create_tool(ToolType.USALIGN)
         assert isinstance(tool, USalign)
 
     def test_raises_for_unknown_tool_type(self):
-        computer = StructSimComputer()
+        computer = StructSimComputer(tm_mode=TmMode.MIN)
         mock_type = MagicMock()
         mock_type.__eq__ = lambda self, other: False
         with pytest.raises(ValueError):
             computer._create_tool(mock_type)
 
     def test_foldseek_score_passed_to_tool(self):
-        computer = StructSimComputer(foldseek_score="TM")
+        computer = StructSimComputer(tm_mode=TmMode.MIN, foldseek_score="TM")
         tool = computer._create_tool(ToolType.FOLDSEEK)
         assert tool.score == "TM"
+
+    def test_tm_mode_passed_to_foldseek(self):
+        computer = StructSimComputer(foldseek_score="TM", tm_mode=TmMode.MAX)
+        tool = computer._create_tool(ToolType.FOLDSEEK)
+        assert tool.tm_mode == TmMode.MAX
+
+    def test_tm_mode_passed_to_usalign(self):
+        computer = StructSimComputer(tm_mode=TmMode.AVG)
+        tool = computer._create_tool(ToolType.USALIGN)
+        assert tool.tm_mode == TmMode.AVG
 
 
 class TestRun:
@@ -47,7 +58,7 @@ class TestRun:
             "Sequence_ID_2": ["B", "C", "D"],
             "score": [0.1, 0.2, 0.3],
         })
-        computer = StructSimComputer(foldseek_score="evalue")
+        computer = StructSimComputer(tm_mode=TmMode.MIN, foldseek_score="evalue")
         with patch("clans3d.similarity.struct_sim_computer.logger") as mock_logger, \
              patch.object(computer, "_create_tool") as mock_factory:
             mock_tool = MagicMock()
@@ -68,7 +79,7 @@ class TestRun:
             "Sequence_ID_2": ["P2"],
             "score": [1e-10],
         })
-        computer = StructSimComputer()
+        computer = StructSimComputer(tm_mode=TmMode.MIN)
         with patch.object(computer, "_create_tool") as mock_factory:
             mock_tool = MagicMock()
             mock_tool.name = "MockTool"
@@ -84,7 +95,7 @@ class TestRun:
         (struct_dir / "P1.cif").write_text("")
         (struct_dir / "P2.cif").write_text("")
 
-        computer = StructSimComputer()
+        computer = StructSimComputer(tm_mode=TmMode.MIN)
         with patch.object(computer, "_create_tool") as mock_factory:
             mock_tool = MagicMock()
             mock_tool.name = "MockTool"

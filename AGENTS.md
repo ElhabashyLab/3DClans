@@ -192,12 +192,12 @@ pytest tests/unit/utils/test_fasta_utils.py::TestExtractUidFromRecordID
 
 ### Test organization rules
 
-| Test tier | Location | External I/O | Speed |
-|-----------|----------|--------------|-------|
-| Unit | `tests/unit/` | fully mocked | < 1 s per test |
-| Integration | `tests/integration/` | fixture files; subprocess + network patched | seconds |
-| Regression | `tests/regression/` | fixture files; no network | < 1 s per test |
-| E2E | `tests/e2e/` | real network + real binaries | minutes |
+| Test tier   | Location             | External I/O                                | Speed          |
+| ----------- | -------------------- | ------------------------------------------- | -------------- |
+| Unit        | `tests/unit/`        | fully mocked                                | < 1 s per test |
+| Integration | `tests/integration/` | fixture files; subprocess + network patched | seconds        |
+| Regression  | `tests/regression/`  | fixture files; no network                   | < 1 s per test |
+| E2E         | `tests/e2e/`         | real network + real binaries                | minutes        |
 
 Unit tests mirror the package layout: `tests/unit/core/`, `tests/unit/similarity/`, `tests/unit/utils/`. New unit test files must follow the same pattern and use `unittest.mock` (stdlib) for all I/O. The `benchmark/` and `legacy/` modules are excluded from coverage (see `pyproject.toml`) and do not have corresponding `tests/unit/` subdirectories — do not create them.
 
@@ -211,17 +211,18 @@ See [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) for a full table of what ea
 3dclans -l <INPUT_FILE> -i <INPUT_TYPE> -t <TOOL> [OPTIONS]
 ```
 
-| Argument | Values | Notes |
-|----------|--------|-------|
-| `-l / --load` | any path | path to the input file |
-| `-i / --input_type` | `fasta` `a2m` `a3m` `tsv` | must match file extension |
-| `-t / --tool` | `foldseek` `USalign` | case-sensitive |
-| `-o / --out` | path | output file path or directory (default `output/clans_files/`) |
-| `-s / --score` | `evalue` `TM` | Foldseek only; default `evalue` |
-| `-c / --conf` | path | config file; CLI args override config |
-| `-w / --workers` | int | parallel download threads (default 10) |
-| `-v / --verbose` | flag | DEBUG logging |
-| `-q / --quiet` | flag | ERROR-only logging; mutually exclusive with `-v` |
+| Argument            | Values                    | Notes                                                                         |
+| ------------------- | ------------------------- | ----------------------------------------------------------------------------- |
+| `-l / --load`       | any path                  | path to the input file                                                        |
+| `-i / --input_type` | `fasta` `a2m` `a3m` `tsv` | must match file extension                                                     |
+| `-t / --tool`       | `foldseek` `USalign`      | case-sensitive                                                                |
+| `-o / --out`        | path                      | output file path or directory (default `output/clans_files/`)                 |
+| `-s / --score`      | `evalue` `TM`             | Foldseek only; default `evalue`                                               |
+| `--tm_mode`         | `min` `max` `mean`        | TM aggregation mode; default `min`; used by USalign and Foldseek with `-s TM` |
+| `-c / --conf`       | path                      | config file; CLI args override config                                         |
+| `-w / --workers`    | int                       | parallel download threads (default 10)                                        |
+| `-v / --verbose`    | flag                      | DEBUG logging                                                                 |
+| `-q / --quiet`      | flag                      | ERROR-only logging; mutually exclusive with `-v`                              |
 
 ### Examples
 
@@ -231,6 +232,9 @@ See [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) for a full table of what ea
 
 # Foldseek with TM-score
 3dclans -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -s TM
+
+# Foldseek with TM-score and explicit TM aggregation mode
+3dclans -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -s TM --tm_mode min
 
 # USalign
 3dclans -l examples/small_fasta_files/5.fasta -i fasta -t USalign
@@ -272,12 +276,12 @@ clans_path, fasta_path = pipeline.run()
 
 Each step is a separate public method, so benchmarking tools can time them independently:
 
-| Step | Method | Description |
-|------|--------|-------------|
-| 1 | `fetch_structures()` | Download AlphaFold CIF files; returns `{uid: region | None}` |
-| 2 | `generate_cleaned_fasta()` | Build cleaned FASTA for successfully downloaded structures |
-| 3 | `compute_scores()` | Run similarity tool; returns DataFrame `[Sequence_ID_1, Sequence_ID_2, score]` |
-| 4 | `generate_clans_file()` | Write `.clans` file; returns output path |
+| Step | Method                     | Description                                                                    |
+| ---- | -------------------------- | ------------------------------------------------------------------------------ | ------ |
+| 1    | `fetch_structures()`       | Download AlphaFold CIF files; returns `{uid: region                            | None}` |
+| 2    | `generate_cleaned_fasta()` | Build cleaned FASTA for successfully downloaded structures                     |
+| 3    | `compute_scores()`         | Run similarity tool; returns DataFrame `[Sequence_ID_1, Sequence_ID_2, score]` |
+| 4    | `generate_clans_file()`    | Write `.clans` file; returns output path                                       |
 
 `pipeline.run()` chains all four steps.
 
@@ -379,11 +383,11 @@ output/
 
 All similarity tools must return a DataFrame with exactly these columns:
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `Sequence_ID_1` | `str` | UniProt accession (UID) of the first protein |
-| `Sequence_ID_2` | `str` | UniProt accession (UID) of the second protein |
-| `score` | `float` | Similarity score (e-value or `1 - max(TM1, TM2)`) |
+| Column          | Type    | Description                                                                                                                            |
+| --------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `Sequence_ID_1` | `str`   | UniProt accession (UID) of the first protein                                                                                           |
+| `Sequence_ID_2` | `str`   | UniProt accession (UID) of the second protein                                                                                          |
+| `score`         | `float` | Similarity score (e-value or TM distance: `1 - min(TM1, TM2)`, `1 - max(TM1, TM2)`, or `1 - ((TM1 + TM2) / 2)` depending on `tm_mode`) |
 
 - Self-hits (`Sequence_ID_1 == Sequence_ID_2`) must be removed.
 - Symmetric duplicates (A→B and B→A) must be deduplicated — keep one row per pair.
@@ -494,6 +498,7 @@ with patch("clans3d.core.pipeline.fetch_structures") as mock_fetch:
 ```
 
 External calls that must always be mocked in unit/integration tests:
+
 - `requests.get` / any network I/O
 - `subprocess.run` / `subprocess.Popen`
 - `download_file()` from `file_utils`
@@ -509,22 +514,22 @@ Only add comments when they match the style of the surrounding code or when expl
 
 ### Python packages (installed via `pip install -e ".[dev]"`)
 
-| Package | Purpose |
-|---------|---------|
-| `biopython` | FASTA parsing, CIF parsing, SeqRecord |
-| `pandas` | Pairwise score DataFrames |
-| `requests` | AlphaFold API, UniProt REST calls |
-| `scipy`, `scikit-learn`, `hdbscan` | Evaluation clustering |
-| `networkx`, `python-igraph`, `leidenalg` | Graph-based clustering |
-| `matplotlib`, `seaborn` | Visualization |
-| `pytest`, `pytest-cov` | Testing (dev only) |
+| Package                                  | Purpose                               |
+| ---------------------------------------- | ------------------------------------- |
+| `biopython`                              | FASTA parsing, CIF parsing, SeqRecord |
+| `pandas`                                 | Pairwise score DataFrames             |
+| `requests`                               | AlphaFold API, UniProt REST calls     |
+| `scipy`, `scikit-learn`, `hdbscan`       | Evaluation clustering                 |
+| `networkx`, `python-igraph`, `leidenalg` | Graph-based clustering                |
+| `matplotlib`, `seaborn`                  | Visualization                         |
+| `pytest`, `pytest-cov`                   | Testing (dev only)                    |
 
 ### External binaries (must be on PATH)
 
-| Binary | Install | Notes |
-|--------|---------|-------|
-| `foldseek` | https://mmseqs.com/foldseek | Linux / macOS only |
-| `USalign` | https://zhanggroup.org/US-align/ | Linux / macOS / Windows |
+| Binary     | Install                          | Notes                   |
+| ---------- | -------------------------------- | ----------------------- |
+| `foldseek` | https://mmseqs.com/foldseek      | Linux / macOS only      |
+| `USalign`  | https://zhanggroup.org/US-align/ | Linux / macOS / Windows |
 
 `verify_tool_dependencies(tool_type)` in `dependency_checks.py` checks for the binary at startup and raises `RuntimeError` if it is missing.
 
@@ -539,7 +544,11 @@ Only add comments when they match the style of the surrounding code or when expl
 ### Foldseek score types behave differently
 
 - `evalue`: lower is more similar (closer to 0 → stronger hit); used directly as the score.
-- `TM`: two TM-scores are returned (`qtmscore`, `ttmscore`); the final score is `1 - max(TM1, TM2)` — **lower means more similar**.
+- `TM`: two TM-scores are returned (`qtmscore`, `ttmscore`). Final TM distance uses `--tm_mode`:
+  - `min` (default): `1 - min(TM1, TM2)`
+  - `max`: `1 - max(TM1, TM2)`
+  - `mean`: `1 - ((TM1 + TM2) / 2)`
+    Lower values still indicate stronger similarity.
 
 Both Foldseek score types and USalign output `score` column values where **lower = more similar**. Keep this in mind when writing threshold logic.
 

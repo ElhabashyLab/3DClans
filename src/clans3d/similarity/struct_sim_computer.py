@@ -4,24 +4,30 @@ from pandas import DataFrame
 from clans3d.similarity.usalign import USalign
 from clans3d.similarity.foldseek import Foldseek
 from clans3d.similarity.tool_type import ToolType
+from clans3d.similarity.tm_mode import TmMode
 from clans3d.similarity.struct_sim_tool import StructSimTool
 
 logger = logging.getLogger(__name__)
 
 
 class StructSimComputer:
-    """
-    This class is responsible for computing structural similarities between protein structures using various tools.
-    """
-    def __init__(self, foldseek_score: str = "evalue", working_dir: str = "work"):
-        """
-        Sets up a tool to compute structural similarities between protein structures.
-        
+    """Compute pairwise structural similarity using a selected backend tool."""
+    def __init__(
+        self,
+        tm_mode: TmMode,
+        foldseek_score: str = "evalue",
+        working_dir: str = "work",
+    ):
+        """Initialize the structural-similarity runner.
+
         Args:
+            tm_mode: TM aggregation mode used by TM-based scoring tools.
             foldseek_score: Score type for Foldseek ("evalue" or "TM").
-            working_dir: Base directory for tool working files. Each tool creates its own subdirectory.
+            working_dir: Base directory for tool working files. Each tool creates
+                its own subdirectory.
         """
         self.foldseek_score = foldseek_score
+        self.tm_mode = tm_mode
         self.working_dir = working_dir
         self.results = {}    
 
@@ -44,8 +50,15 @@ class StructSimComputer:
     def _create_tool(self, tool_type: ToolType) -> StructSimTool:
         """Factory method to create the appropriate tool instance."""
         if tool_type == ToolType.FOLDSEEK:
-            return Foldseek(self.foldseek_score, os.path.join(self.working_dir, "foldseek"))
+            return Foldseek(
+                score=self.foldseek_score,
+                tm_mode=self.tm_mode,
+                working_dir=os.path.join(self.working_dir, "foldseek"),
+            )
         elif tool_type == ToolType.USALIGN:
-            return USalign(os.path.join(self.working_dir, "usalign"))
+            return USalign(
+                tm_mode=self.tm_mode,
+                working_dir=os.path.join(self.working_dir, "usalign"),
+            )
         else:
             raise ValueError(f"Tool {tool_type.value} is not available.")

@@ -5,6 +5,7 @@ from unittest.mock import patch
 from clans3d.core.pipeline import ClansPipeline, PipelineConfig
 from clans3d.core.input_file_type import InputFileType
 from clans3d.similarity.tool_type import ToolType
+from clans3d.similarity.tm_mode import TmMode
 
 
 @pytest.fixture
@@ -54,6 +55,23 @@ class TestPipelineConfigDefaults:
             output_filename="custom.clans",
         )
         assert config.output_filename == "custom.clans"
+
+    def test_default_tm_mode_is_min(self, fasta_path):
+        config = PipelineConfig(
+            input_file=fasta_path,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+        )
+        assert config.tm_mode == TmMode.MIN
+
+    def test_custom_tm_mode_enum_is_stored(self, fasta_path):
+        config = PipelineConfig(
+            input_file=fasta_path,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+            tm_mode=TmMode.AVG,
+        )
+        assert config.tm_mode == TmMode.AVG
 
 
 class TestClansPipelineValidate:

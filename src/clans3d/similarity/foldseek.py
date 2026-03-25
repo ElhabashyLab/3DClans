@@ -3,6 +3,7 @@ import os
 import subprocess
 import pandas as pd
 from clans3d.similarity.struct_sim_tool import StructSimTool
+from clans3d.similarity.tm_mode import TmMode
 from clans3d.utils.file_utils import reset_dir_content
 
 logger = logging.getLogger(__name__)
@@ -24,9 +25,22 @@ class Foldseek(StructSimTool):
         3. (convert into readable output)
         foldseek convertalis <i:queryDb> <i:targetDb> <i:alignmentDB> <o:alignmentFile> [options][/+][-]
     """
-    def __init__(self, score: str, working_dir: str = os.path.join("work", "foldseek")):
+    def __init__(
+        self,
+        score: str,
+        tm_mode: TmMode,
+        working_dir: str = os.path.join("work", "foldseek")        
+    ):
+        """Initialize Foldseek wrapper.
+
+        Args:
+            score: Foldseek score type ("evalue" or "TM").
+            tm_mode: TM aggregation mode used when ``score == "TM"``.
+            working_dir: Tool-specific working directory.
+        """
         description = "A tool for protein structure comparison using Foldseek."
         self.score = score
+        self.tm_mode = tm_mode
         super().__init__("foldseek", description, working_dir)
         self.command_createdb = "createdb"  # command to create a database
         self.command_search = "search"  # command to search in the database
@@ -171,8 +185,11 @@ class Foldseek(StructSimTool):
 
     def _clean_scores(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Receives a DataFrame containing the columns 'Sequence_ID_1, Sequence_ID_2, score' and returns a cleaned DataFrame with no duplicate rows.
-        The score is transformed based on self.score (if self.score is "TM", the maximum of TM1 and TM2 is taken and transformed to a distance metric by 1 - maxTM, if self.score is "evalue", the evalue is taken as score).
+        Clean and normalize Foldseek output scores.
+
+        The method removes self-hits and symmetric duplicates. For ``TM`` mode,
+        ``TM1`` and ``TM2`` are combined according to ``self.tm_mode`` and then
+        converted to CLANS distance using ``1 - TM``.
         
         Args:
             df (pd.DataFrame): A DataFrame containing the columns 'Sequence_ID_1, Sequence_ID_2, score'
@@ -187,9 +204,14 @@ class Foldseek(StructSimTool):
         df3 = df2[df2['Sequence_ID_1'] != df2['Sequence_ID_2']].copy()
         # clean scores based on self.score
         if self.score == "TM":
-            df3['maxTM'] = df3[['TM1', 'TM2']].max(axis=1)
-            df3["score"] = 1 - df3["maxTM"]
-            df4 = df3.drop(columns=['TM1', 'TM2', 'maxTM'])
+            if self.tm_mode == TmMode.MIN:
+                df3["TM"] = df3[["TM1", "TM2"]].min(axis=1)
+            elif self.tm_mode == TmMode.MAX:
+                df3["TM"] = df3[["TM1", "TM2"]].max(axis=1)
+            else:
+                df3["TM"] = df3[["TM1", "TM2"]].mean(axis=1)
+            df3["score"] = 1 - df3["TM"]
+            df4 = df3.drop(columns=['TM1', 'TM2', 'TM'])
         else:
             df3['score'] = df3['evalue']
             df4 = df3.drop(columns=['evalue'])

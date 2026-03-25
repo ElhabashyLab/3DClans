@@ -2,6 +2,7 @@
 import pytest
 from clans3d.core.input_file_type import InputFileType
 from clans3d.similarity.tool_type import ToolType
+from clans3d.similarity.tm_mode import TmMode
 
 
 class TestInputFileType:
@@ -37,3 +38,22 @@ class TestToolType:
     def test_value_attribute(self):
         assert ToolType.FOLDSEEK.value == "foldseek"
         assert ToolType.USALIGN.value == "USalign"
+
+
+class TestTmMode:
+    @pytest.mark.parametrize("value, expected", [
+        ("min", TmMode.MIN),
+        ("max", TmMode.MAX),
+        ("mean", TmMode.AVG),
+    ])
+    def test_from_string(self, value, expected):
+        assert TmMode(value) == expected
+
+    def test_invalid_value_raises(self):
+        with pytest.raises(ValueError):
+            TmMode("median")
+
+    def test_value_attribute(self):
+        assert TmMode.MIN.value == "min"
+        assert TmMode.MAX.value == "max"
+        assert TmMode.AVG.value == "mean"

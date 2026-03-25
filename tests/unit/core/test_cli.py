@@ -40,6 +40,16 @@ class TestParseArgs:
         args = parse_args(["-l", fasta_path, "-i", "fasta", "-t", "foldseek"])
         assert args.score is None
 
+    def test_default_tm_mode_is_min(self, fasta_path):
+        args = parse_args(["-l", fasta_path, "-i", "fasta", "-t", "foldseek"])
+        assert args.tm_mode == "min"
+
+    def test_tm_mode_argument(self, fasta_path):
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek", "--tm_mode", "mean"
+        ])
+        assert args.tm_mode == "mean"
+
     def test_invalid_tool_raises(self, fasta_path):
         with pytest.raises(SystemExit):
             parse_args(["-l", fasta_path, "-i", "fasta", "-t", "blast"])
@@ -63,6 +73,15 @@ class TestParseArgs:
             "-s", "TM", "-c", str(conf),
         ])
         assert args.score == "TM"
+
+    def test_cli_tm_mode_overrides_config(self, fasta_path, tmp_path):
+        conf = tmp_path / "test.conf"
+        conf.write_text("-tm_mode min\n")
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "--tm_mode", "max", "-c", str(conf),
+        ])
+        assert args.tm_mode == "max"
 
     def test_default_out_is_none(self, fasta_path):
         args = parse_args(["-l", fasta_path, "-i", "fasta", "-t", "foldseek"])
