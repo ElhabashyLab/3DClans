@@ -256,10 +256,10 @@ CLI arguments override any values set in the config file.
 #### TM aggregation mode examples
 
 ```bash
-# Default (recommended for reducing hub effects): 1 - min(TM1, TM2)
+# Default (measures how similar two structures are): 1 - min(TM1, TM2)
 3dclans -l proteins.fasta -i fasta -t foldseek -s TM --tm_mode min
 
-# Domain-focused matching: 1 - max(TM1, TM2)
+# Domain-focused matching (measures how much the smaller structure is contained in the bigger structure): 1 - max(TM1, TM2)
 3dclans -l proteins.fasta -i fasta -t foldseek -s TM --tm_mode max
 
 # Balanced compromise: 1 - ((TM1 + TM2) / 2)
