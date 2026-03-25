@@ -182,7 +182,7 @@ Get-Command USalign # Windows (PowerShell)
 | --------------------- | ------------------------------------------------------------------------------------------------- |
 | `-o, --out <PATH>`    | Output path for the CLANS file (file path or directory; default: `output/clans_files/`)           |
 | `-s, --score <SCORE>` | Foldseek score type: `evalue` (default) or `TM`. Only valid with `-t foldseek`                    |
-| `--tm_mode <MODE>`    | TM aggregation mode: `min` (default), `max`, or `mean`. Used by USalign and Foldseek with `-s TM` |
+| `-m, --tm_mode <MODE>`| TM aggregation mode: `min` (default), `max`, or `mean`. Used by USalign and Foldseek with `-s TM` |
 | `-c, --conf <PATH>`   | Configuration file (CLI arguments override config values)                                         |
 | `-w, --workers <N>`   | Number of parallel threads for structure downloads (default: `10`)                                |
 | `-v, --verbose`       | Enable debug-level logging                                                                        |
