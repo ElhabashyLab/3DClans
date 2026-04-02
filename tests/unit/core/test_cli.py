@@ -119,6 +119,18 @@ class TestParseArgs:
         ])
         assert args.out == "/tmp/from_cli.clans"
 
+    def test_workers_default_is_10(self, fasta_path):
+        args = parse_args(["-l", fasta_path, "-i", "fasta", "-t", "foldseek"])
+        assert args.workers == 10
+
+    def test_workers_rejects_zero(self, fasta_path):
+        with pytest.raises(SystemExit):
+            parse_args(["-l", fasta_path, "-i", "fasta", "-t", "foldseek", "-w", "0"])
+
+    def test_workers_rejects_negative(self, fasta_path):
+        with pytest.raises(SystemExit):
+            parse_args(["-l", fasta_path, "-i", "fasta", "-t", "foldseek", "-w", "-3"])
+
 
 class TestResolveOutputPath:
     def test_none_returns_default(self):

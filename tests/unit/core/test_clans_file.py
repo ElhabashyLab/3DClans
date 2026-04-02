@@ -117,12 +117,12 @@ class TestClansFileStr:
         assert "ACDE" in self.content
         assert "FGHI" in self.content
 
-    def test_parameters_written_with_dash_prefix(self):
+    def test_parameters_written_with_equals_format(self):
         cf = ClansFile(3, _make_coords(), _make_scores(), fasta_records=_make_records(),
                        parameters={"pval": "1e-5", "maxmove": "0.1"})
         content = str(cf)
-        assert "-pval 1e-5" in content
-        assert "-maxmove 0.1" in content
+        assert "pval=1e-5" in content
+        assert "maxmove=0.1" in content
 
     def test_empty_scores_produces_empty_hsp_block(self):
         empty = pd.DataFrame(columns=["Sequence_ID_1", "Sequence_ID_2", "score"])

@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import StringIO
 import re
 from Bio import SeqIO
@@ -8,6 +9,7 @@ import requests
 import pandas as pd
 from clans3d.core.input_file_type import InputFileType
 from clans3d.utils.api_utils import uniprot_accessions_to_uniparc_accessions
+from clans3d.utils.log import _log_interval
 
 logger = logging.getLogger(__name__)
 
@@ -168,8 +170,8 @@ def create_mock_up_record(uid: str, region: tuple[int, int] | None) -> SeqRecord
     if region is None:
         region_str = ""
     else:
-        region_str = f"/{int(region[0])}-{int(region[1])}"
-    record_id = f"|{uid}|{region_str}"
+        region_str = f"{int(region[0])}-{int(region[1])}"
+    record_id = f"{uid}/{region_str}"
     record = SeqRecord(Seq("not_found"), id=record_id, description="")
     return record
 
@@ -274,30 +276,86 @@ def filter_input_file(in_path: str, out_path: str, dataset_type: InputFileType):
         raise ValueError("Unsupported dataset type. Use InputFileType.FASTA or InputFileType.TSV.")
 
 
-def generate_fasta_from_uids_with_regions(uids_with_regions: dict[str, tuple[int, int] | None], out_path: str):
+
+def _download_or_mock_fasta_record(
+    uid: str,
+    upi: str | None,
+    region: tuple[int, int] | None,
+) -> tuple[SeqRecord, bool]:
+    """Download one FASTA record and fall back to a mock-up record on failure."""
+    try:
+        record = download_fasta_record(uid, upi, region)
+        # Keep existing UID
+        record.id = uid
+        return record, True
+    except (ValueError, requests.exceptions.RequestException) as e:
+        logger.warning("Could not download %s: %s — using mock-up", uid, e)
+        return create_mock_up_record(uid, region), False
+
+
+def generate_fasta_from_uids_with_regions(
+    uids_with_regions: dict[str, tuple[int, int] | None],
+    out_path: str,
+    max_workers: int = 10,
+):
     """
     Generates a FASTA file by downloading sequences for the given UIDs and regions from UniProt.
+
+    Downloads are performed concurrently with bounded workers while preserving
+    deterministic output ordering based on the input mapping order.
 
     Args:
         uids_with_regions (dict[str, tuple[int, int] | None]): Mapping {uid: (region_start, region_end) | None}.
         out_path (str): Path to the output FASTA file.
+        max_workers (int): Maximum number of concurrent download threads.
+
     Returns:
         str: Path to the output FASTA file.
     """
+
     logger.debug("Generating FASTA from UIDs with regions...")
-    uids = list(uids_with_regions.keys())
-    records = []
+    items = list(uids_with_regions.items())
+    total = len(items)
+
+    uids = [uid for uid, _ in items]
     uids_to_upis = uniprot_accessions_to_uniparc_accessions(uids)
-    for uid, region in uids_with_regions.items():
-        upi = uids_to_upis.get(uid)
-        try:
-            record = download_fasta_record(uid, upi, region)
-            record.id = uid
-            records.append(record)
-        except (ValueError, requests.exceptions.RequestException) as e:
-            logger.warning("Could not download %s: %s — using mock-up", uid, e)
-            records.append(create_mock_up_record(uid, region))
-    SeqIO.write(records, out_path, "fasta")
+
+    records: list[SeqRecord | None] = [None] * total
+    successful_downloads = 0
+    interval = _log_interval(total)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {
+            executor.submit(
+                _download_or_mock_fasta_record,
+                uid,
+                uids_to_upis.get(uid),
+                region,
+            ): idx
+            for idx, (uid, region) in enumerate(items)
+        }
+
+        completed = 0
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
+            record, was_downloaded = future.result()
+            records[idx] = record
+            if was_downloaded:
+                successful_downloads += 1
+
+            completed += 1
+            if completed % interval == 0 or completed == total:
+                logger.info("Downloading FASTA records %d/%d...", completed, total)
+
+    failed = total - successful_downloads
+    logger.info(
+        "Downloaded %d/%d FASTA records (%d mock-up).",
+        successful_downloads,
+        total,
+        failed,
+    )
+
+    SeqIO.write([record for record in records if record is not None], out_path, "fasta")
     return out_path
 
 

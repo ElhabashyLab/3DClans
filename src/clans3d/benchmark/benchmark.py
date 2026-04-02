@@ -308,16 +308,76 @@ class Benchmark:
 
 # example benchmark run
 if __name__ == "__main__":
-    # Configuration - edit these values to benchmark different files
-    input_file = "examples/big_tsv_files/500.tsv"
-    input_type = InputFileType.TSV
-    
-    # Run benchmark
-    benchmark = Benchmark(input_file, input_type, num_workers=50)
-    df = benchmark.run_all_tools()
-    
-    # Display results
-    benchmark.print_results()
-    
-    # Export to CSV
-    benchmark.export_csv()
+    import matplotlib.pyplot as plt
+
+    # Precomputed benchmark runs for 100, 500, 1000, and 2000 inputs.
+    benchmark_csvs = {
+        100: "benchmark_output/run_20260326_223852/benchmark_results.csv",
+        500: "benchmark_output/run_20260326_223026/benchmark_results.csv",
+        1000: "benchmark_output/run_20260326_204431/benchmark_results.csv",
+        2000: "benchmark_output/run_20260326_205154/benchmark_results.csv",
+    }
+
+    sizes = []
+    download_times = []
+    computation_times = []
+    n_struct = []
+
+    for size in sorted(benchmark_csvs):
+        df = pd.read_csv(benchmark_csvs[size])
+        if df.empty:
+            raise ValueError(f"No rows found in benchmark CSV: {benchmark_csvs[size]}")
+
+        row = df.iloc[0]
+        download_time = float(row["Download Time (s)"])
+        computation_time = float(row["Computation Time (s)"])
+        number_of_structures = int(row["Num Structures"])
+
+        sizes.append(size)
+        download_times.append(download_time)
+        computation_times.append(computation_time)
+        n_struct.append(number_of_structures)
+
+    combined_times = [
+        download + computation
+        for download, computation in zip(download_times, computation_times)
+    ]
+
+    plt.figure(figsize=(9, 5))
+    bars_download = plt.bar(
+        [str(size) for size in n_struct],
+        download_times,
+        color="#4C78A8",
+        edgecolor="black",
+        label="Download",
+    )
+    plt.bar(
+        [str(size) for size in n_struct],
+        computation_times,
+        bottom=download_times,
+        color="#F58518",
+        edgecolor="black",
+        label="Computation",
+    )
+
+    plt.xlabel("Input size")
+    plt.ylabel("Download + Computation Time (s)")
+    plt.title("3DClans Benchmark: Download + Computation Time")
+    plt.grid(axis="y", linestyle="--", alpha=0.4)
+    plt.legend()
+
+    for bar, value in zip(bars_download, combined_times):
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            value,
+            f"{value:.2f}",
+            ha="center",
+            va="bottom",
+        )
+
+    output_plot = "benchmark_output/download_plus_computation_bar_chart.png"
+    plt.tight_layout()
+    plt.savefig(output_plot, dpi=300)
+
+    print(f"Saved bar chart to: {output_plot}")
+
