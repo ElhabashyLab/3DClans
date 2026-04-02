@@ -170,8 +170,8 @@ def create_mock_up_record(uid: str, region: tuple[int, int] | None) -> SeqRecord
     if region is None:
         region_str = ""
     else:
-        region_str = f"/{int(region[0])}-{int(region[1])}"
-    record_id = f"|{uid}|{region_str}"
+        region_str = f"{int(region[0])}-{int(region[1])}"
+    record_id = f"{uid}/{region_str}"
     record = SeqRecord(Seq("not_found"), id=record_id, description="")
     return record
 

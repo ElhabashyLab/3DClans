@@ -21,7 +21,7 @@ def _build_main_parser() -> argparse.ArgumentParser:
     """Build the full CLI argument parser."""
     parser = argparse.ArgumentParser(
         description=(
-            "Command line parser to read fasta A2M or tsv files and "
+            "Command line parser to read fasta A2M, A3M or tsv files and "
             "generating clans files based on structural similarity scores."
         )
     )
