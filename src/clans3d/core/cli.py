@@ -42,6 +42,17 @@ def _build_main_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--structures_db",
+        required=False,
+        type=str,
+        default=None,
+        help=(
+            "optional path to a directory containing local CIF structures named "
+            "<UniProtAccession>.cif. When provided, AlphaFold downloads are skipped."
+        ),
+    )
+
+    parser.add_argument(
         "-c", "--conf",
         required=False,
         type=str,

@@ -73,6 +73,14 @@ class TestPipelineConfigDefaults:
         )
         assert config.tm_mode == TmMode.AVG
 
+    def test_default_structures_db_is_none(self, fasta_path):
+        config = PipelineConfig(
+            input_file=fasta_path,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+        )
+        assert config.structures_db is None
+
 
 class TestClansPipelineValidate:
     def test_raises_file_not_found(self, tmp_path):
@@ -112,6 +120,28 @@ class TestClansPipelineValidate:
         pipeline = ClansPipeline(config)  # should not raise
         assert pipeline is not None
 
+    def test_accepts_existing_structures_db_directory(self, fasta_path, tmp_path):
+        structures_db = tmp_path / "structures_db"
+        structures_db.mkdir()
+        config = PipelineConfig(
+            input_file=fasta_path,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+            structures_db=str(structures_db),
+        )
+        pipeline = ClansPipeline(config)
+        assert pipeline is not None
+
+    def test_rejects_missing_structures_db_directory(self, fasta_path, tmp_path):
+        config = PipelineConfig(
+            input_file=fasta_path,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+            structures_db=str(tmp_path / "missing_db"),
+        )
+        with pytest.raises(ValueError, match="structures_db"):
+            ClansPipeline(config)
+
 
 class TestFetchStructures:
     @pytest.fixture
@@ -136,6 +166,30 @@ class TestFetchStructures:
              patch("os.makedirs"):
             result = pipeline.fetch_structures()
         assert result == expected
+
+    def test_uses_local_structures_db_when_configured(self, fasta_path, tmp_path):
+        structures_db = tmp_path / "structures_db"
+        structures_db.mkdir()
+        config = PipelineConfig(
+            input_file=fasta_path,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+            structures_db=str(structures_db),
+        )
+        pipeline = ClansPipeline(config)
+        expected = {"P11111": None}
+        with patch("clans3d.core.pipeline.prepare_structures_from_local_db", return_value=expected) as mock_prepare, \
+             patch("clans3d.core.pipeline.fetch_structures") as mock_download:
+            result = pipeline.fetch_structures()
+        assert result == expected
+        mock_prepare.assert_called_once_with(
+            fasta_path,
+            InputFileType.FASTA,
+            str(structures_db),
+            config.structures_dir,
+            max_workers=config.download_workers,
+        )
+        mock_download.assert_not_called()
 
 
 class TestGenerateCleanedFastaTSV:

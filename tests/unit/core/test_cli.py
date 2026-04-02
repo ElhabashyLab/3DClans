@@ -50,6 +50,15 @@ class TestParseArgs:
         ])
         assert args.tm_mode == "mean"
 
+    def test_structures_db_argument(self, fasta_path, tmp_path):
+        structures_db = tmp_path / "db"
+        structures_db.mkdir()
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "--structures_db", str(structures_db),
+        ])
+        assert args.structures_db == str(structures_db)
+
     def test_invalid_tool_raises(self, fasta_path):
         with pytest.raises(SystemExit):
             parse_args(["-l", fasta_path, "-i", "fasta", "-t", "blast"])
@@ -82,6 +91,19 @@ class TestParseArgs:
             "--tm_mode", "max", "-c", str(conf),
         ])
         assert args.tm_mode == "max"
+
+    def test_cli_structures_db_overrides_config(self, fasta_path, tmp_path):
+        config_db = tmp_path / "config_db"
+        cli_db = tmp_path / "cli_db"
+        config_db.mkdir()
+        cli_db.mkdir()
+        conf = tmp_path / "test.conf"
+        conf.write_text(f"-structures_db {config_db}\n")
+        args = parse_args([
+            "-l", fasta_path, "-i", "fasta", "-t", "foldseek",
+            "--structures_db", str(cli_db), "-c", str(conf),
+        ])
+        assert args.structures_db == str(cli_db)
 
     def test_default_out_is_none(self, fasta_path):
         args = parse_args(["-l", fasta_path, "-i", "fasta", "-t", "foldseek"])

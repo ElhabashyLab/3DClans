@@ -64,8 +64,8 @@ Unit tests live in `tests/unit/` and are organized to mirror the `src/clans3d/` 
 | `TestRemoveNonExistingUniprotAccessions` | Filters out accessions absent from a mocked UniProt response                                           |
 | `TestGenerateFastaFromUidsWithRegions`   | Generates FASTA lines with region annotations from a UID/region mapping                                |
 | `TestCleanAlignedSequence`               | Removes alignment gap chars (`.` and `-`), preserves lowercase insertions, uppercases output           |
-| `TestGenerateFastaFromAlignmentFile`     | Generates cleaned FASTA from A2M/A3M-style alignments, handles invalid headers and empty inputs         |
-| `TestCleanedSequenceMatchesRegionLength` | Ensures cleaned sequence lengths match requested region spans across representative cases                |
+| `TestGenerateFastaFromAlignmentFile`     | Generates cleaned FASTA from A2M/A3M-style alignments, handles invalid headers and empty inputs        |
+| `TestCleanedSequenceMatchesRegionLength` | Ensures cleaned sequence lengths match requested region spans across representative cases              |
 
 ### `utils/api_utils.py` — `tests/unit/utils/test_api_utils.py`
 
@@ -99,15 +99,16 @@ Unit tests live in `tests/unit/` and are organized to mirror the `src/clans3d/` 
 
 ### `utils/structure_utils.py` — `tests/unit/utils/test_structure_utils.py`
 
-| Covered class / method           | What is tested                                                                                            |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `TestLogInterval`                | Correct log interval for small, medium, and large totals                                                  |
-| `TestParseRegionFromTsvRow`      | Valid TSV row returns `(start, end)`; malformed row raises                                                |
-| `TestFetchAlphafoldCifUrl`       | Mocked API returns correct CIF URL; missing entry returns `None`                                          |
-| `TestDownloadAlphafoldStructure` | File written on success; returns `False` on API error; region extraction called only when region provided |
-| `TestFetchStructures`            | Dispatches to correct handler for FASTA/A2M/TSV; raises `ValueError` for unsupported type                 |
-| `TestRunDownloadTasks`           | Parallel download task behavior: successful-result filtering, worker count usage, exception propagation   |
-| `TestExtractRegionOfProtein`     | Output CIF contains only residues within the specified range                                              |
+| Covered class / method             | What is tested                                                                                                                      |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `TestLogInterval`                  | Correct log interval for small, medium, and large totals                                                                            |
+| `TestParseRegionFromTsvRow`        | Valid TSV row returns `(start, end)`; malformed row raises                                                                          |
+| `TestFetchAlphafoldCifUrl`         | Mocked API returns correct CIF URL; missing entry returns `None`                                                                    |
+| `TestDownloadAlphafoldStructure`   | File written on success; returns `False` on API error; region extraction called only when region provided                           |
+| `TestFetchStructures`              | Dispatches to correct handler for FASTA/A2M/TSV; raises `ValueError` for unsupported type                                           |
+| `TestRunDownloadTasks`             | Parallel download task behavior: successful-result filtering, worker count usage, exception propagation                             |
+| `TestExtractRegionOfProtein`       | Output CIF contains only residues within the specified range                                                                        |
+| `TestPrepareStructuresFromLocalDb` | Local CIF database files are copied into the work dir; missing files are skipped; regions are trimmed; source files are not mutated |
 
 ### `core/clans_file.py` — `tests/unit/core/test_clans_file.py`
 
@@ -154,12 +155,13 @@ Unit tests live in `tests/unit/` and are organized to mirror the `src/clans3d/` 
 | `TestPipelineConfigDefaults` | `structures_dir`, `output_dir`, `cleaned_input_storage` use expected default paths                                   |
 | `TestClansPipelineValidate`  | Raises `FileNotFoundError` for missing input; raises `ValueError` on extension mismatch and invalid tool/score combo |
 | `TestFetchStructures`        | Correct structures-fetch function called for the configured input type                                               |
+| `TestFetchStructures`        | Local DB branch validates `structures_db` and routes through local CIF preparation instead of AlphaFold download     |
 
 ### `core/cli.py` — `tests/unit/core/test_cli.py`
 
-| Covered class / method | What is tested                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `TestParseArgs`        | Required args → correct namespace; config file merged and overridden by CLI; invalid tool/type → parse error |
+| Covered class / method | What is tested                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TestParseArgs`        | Required args → correct namespace; config file merged and overridden by CLI; invalid tool/type → parse error; `--structures_db` is parsed and overridden correctly |
 
 ### `similarity/foldseek.py` — `tests/unit/similarity/test_foldseek.py`
 
@@ -219,9 +221,9 @@ pytest tests/integration/
 
 Validates region-based cleaning against known UniProt regions and confirms lowercase residues are treated as real amino acids (not removed as gaps).
 
-| Class                               | What is verified                                                                 |
-| ----------------------------------- | -------------------------------------------------------------------------------- |
-| `TestCleanedSequenceMatchesUniProt` | Cleaned extracted sequence matches expected UniProt region content and length    |
+| Class                               | What is verified                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------- |
+| `TestCleanedSequenceMatchesUniProt` | Cleaned extracted sequence matches expected UniProt region content and length     |
 | `TestRealA2MFileAgainstUniProt`     | Real fixture A2M entries match expected UniProt-derived cleaned sequences         |
 | `TestLowercaseAreRealResidues`      | Lowercase letters are preserved as residues; removing them would lose information |
 
@@ -237,6 +239,22 @@ Uses `tests/fixtures/small.fasta` (3 sequences) with `fetch_structures` and `Str
 | `test_run_returns_existing_fasta_path`           | Cleaned FASTA path is returned and the file exists      |
 | `test_run_output_contains_all_required_sections` | All required CLANS sections are present                 |
 | `test_run_raises_when_no_structures_available`   | `RuntimeError` raised when no structures are downloaded |
+
+### `tests/integration/test_pipeline_mocked.py` — `TestPipelineMockedLocalStructuresDb` (FASTA input with local CIF database)
+
+Uses the same FASTA fixture as the standard pipeline integration tests, but configures `structures_db` and verifies that the local-DB branch is used instead of the AlphaFold download path.
+
+| Test                                       | What is verified                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| `test_run_uses_local_structures_db_branch` | Pipeline runs successfully with `structures_db` and skips download |
+
+### `tests/e2e/test_pipeline_e2e.py` — `TestPipelineLocalStructuresDb` (FASTA input with local CIF database)
+
+Builds a tiny two-sequence FASTA input and a temporary local CIF database from the existing `small.cif` fixture, then runs the full pipeline with the real Foldseek binary. This confirms that the local-db mode works end-to-end without AlphaFold downloads.
+
+| Test                                            | What is verified                                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `test_foldseek_runs_against_local_cif_database` | Pipeline succeeds with `structures_db`, produces output, and preserves the expected sequence count |
 
 ### `tests/integration/test_pipeline_mocked.py` — `TestPipelineMockedTSV` (TSV input)
 
@@ -291,10 +309,10 @@ pytest tests/e2e/ -m e2e
 FASTA input: `examples/small_fasta_files/5.fasta` (4 real MYOD1 orthologs + 1 unavailable entry; ≥ 3 structures expected to download successfully).
 TSV input: `examples/small_tsv_files/5.tsv` (same accessions in TSV format; sequences fetched from UniProt).
 
-| Class                        | Tool                | Input | Tests                                                              |
-| ---------------------------- | ------------------- | ----- | ------------------------------------------------------------------ |
-| `TestPipelineFoldseekEvalue` | Foldseek (evalue)   | FASTA | File created, ≥ 3 sequences, ≥ 1 score entry, all sections present |
-| `TestPipelineFoldseekTM`     | Foldseek (TM score) | FASTA | File created, all scores in `[0, 1]`                               |
-| `TestPipelineUSalign`        | USalign             | FASTA | File created, ≥ 3 sequences, ≥ 1 score entry                       |
-| `TestCliEntrypoint`          | Foldseek            | FASTA | `3dclans` subprocess exits with code `0`                           |
+| Class                        | Tool                | Input | Tests                                                               |
+| ---------------------------- | ------------------- | ----- | ------------------------------------------------------------------- |
+| `TestPipelineFoldseekEvalue` | Foldseek (evalue)   | FASTA | File created, ≥ 3 sequences, ≥ 1 score entry, all sections present  |
+| `TestPipelineFoldseekTM`     | Foldseek (TM score) | FASTA | File created, all scores in `[0, 1]`                                |
+| `TestPipelineUSalign`        | USalign             | FASTA | File created, ≥ 3 sequences, ≥ 1 score entry                        |
+| `TestCliEntrypoint`          | Foldseek            | FASTA | `3dclans` subprocess exits with code `0`                            |
 | `TestPipelineTSVInput`       | Foldseek (evalue)   | TSV   | File created, ≥ 3 sequences, ≥ 1 score entry, cleaned FASTA written |

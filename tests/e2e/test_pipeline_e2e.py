@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -47,6 +48,12 @@ def _parse_score_count(clans_path: str) -> int:
         return 0
     hsp_section = content.split("<hsp>")[1].split("</hsp>")[0]
     return len([l for l in hsp_section.strip().splitlines() if l.strip()])
+
+
+def _build_local_structure_db(structures_db: Path, source_cif: str) -> None:
+    structures_db.mkdir()
+    shutil.copy2(source_cif, structures_db / "P11111.cif")
+    shutil.copy2(source_cif, structures_db / "P22222.cif")
 
 
 @pytest.fixture
@@ -213,3 +220,38 @@ class TestPipelineTSVInput:
     def test_cleaned_fasta_is_written(self, foldseek_tsv_pipeline):
         _, fasta_path = foldseek_tsv_pipeline.run()
         assert os.path.isfile(fasta_path)
+
+
+@pytest.mark.e2e
+class TestPipelineLocalStructuresDb:
+    def test_foldseek_runs_against_local_cif_database(self, tmp_path):
+        if not shutil.which("foldseek"):
+            pytest.skip("foldseek not in PATH")
+
+        input_path = tmp_path / "local_db_input.fasta"
+        input_path.write_text(
+            ">sp|P11111|PROT1_HUMAN/1-5\nACDEFGHIKLMNPQRSTVWY\n"
+            ">sp|P22222|PROT2_MOUSE\nACDEFGHIKLMNPQRSTVWY\n"
+        )
+
+        structures_db = tmp_path / "structures_db"
+        _build_local_structure_db(
+            structures_db,
+            os.path.join(os.path.dirname(__file__), "..", "fixtures", "small.cif"),
+        )
+
+        config = PipelineConfig(
+            input_file=str(input_path),
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+            structures_dir=str(tmp_path / "structures"),
+            output_dir=str(tmp_path / "output"),
+            cleaned_input_storage=str(tmp_path / "cleaned"),
+            structures_db=str(structures_db),
+        )
+        pipeline = ClansPipeline(config)
+        clans_path, fasta_path = pipeline.run()
+
+        assert os.path.isfile(clans_path)
+        assert os.path.isfile(fasta_path)
+        assert _parse_sequence_count(clans_path) == 2

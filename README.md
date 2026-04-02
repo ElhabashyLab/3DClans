@@ -53,7 +53,7 @@ Input File (FASTA / A2M / A3M / TSV)
 ```
 
 1. **Input parsing** — Extracts UniProt accessions and optional region annotations from the input file.
-2. **Structure retrieval** — Downloads AlphaFold-predicted structures in CIF format. If a region is specified (e.g., residues 2–300), only that region is extracted. Downloads run in parallel (default: 10 workers), configurable via `-w/--workers`.
+2. **Structure retrieval** — Downloads AlphaFold-predicted structures in CIF format by default. If a region is specified (e.g., residues 2-300), only that region is extracted. Downloads run in parallel (default: 10 workers), configurable via `-w/--workers`. Alternatively the users can provide a local CIF database via `--structures_db` to skip AlphaFold downloads.
 3. **Pairwise similarity** — Runs an all-vs-all structural comparison using Foldseek (fast, E-value or TM-score) or USalign (slower, TM-score). This produces `n*(n-1)/2` pairwise scores.
 4. **CLANS file generation** — Writes a CLANS-format file containing the sequences, pairwise scores, and initial random 3D coordinates for visualization.
 
@@ -170,23 +170,24 @@ Get-Command USalign # Windows (PowerShell)
 
 #### Required arguments
 
-| Argument                  | Description                                   |
-| ------------------------- | --------------------------------------------- |
-| `-l, --load <PATH>`       | Path to the input file                        |
-| `-i, --input_type <TYPE>` | Input format: `fasta`, `a2m`, `a3m`, or `tsv` |
-| `-t, --tool <TOOL>`       | Similarity tool: `foldseek` or `USalign`      |
+| Argument                  | Description                                                               |
+| ------------------------- | ------------------------------------------------------------------------- |
+| `-l, --load <PATH>`       | Path to the input file                                                    |
+| `-i, --input_type <TYPE>` | Input format: `fasta`, `a2m`, `a3m`, or `tsv`                             |
+| `-t, --tool <TOOL>`       | Similarity tool: `foldseek` or `USalign`                                  |
+| `--structures_db <PATH>`  | Optional local CIF database; files must be named `<UniProtAccession>.cif` |
 
 #### Optional arguments
 
-| Argument              | Description                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------- |
-| `-o, --out <PATH>`    | Output path for the CLANS file (file path or directory; default: `output/clans_files/`)           |
-| `-s, --score <SCORE>` | Foldseek score type: `evalue` (default) or `TM`. Only valid with `-t foldseek`                    |
-| `-m, --tm_mode <MODE>`| TM aggregation mode: `min` (default), `max`, or `mean`. Used by USalign and Foldseek with `-s TM` |
-| `-c, --conf <PATH>`   | Configuration file (CLI arguments override config values)                                         |
-| `-w, --workers <N>`   | Number of parallel threads for structure downloads (default: `10`)                                |
-| `-v, --verbose`       | Enable debug-level logging                                                                        |
-| `-q, --quiet`         | Suppress all output except errors                                                                 |
+| Argument               | Description                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| `-o, --out <PATH>`     | Output path for the CLANS file (file path or directory; default: `output/clans_files/`)           |
+| `-s, --score <SCORE>`  | Foldseek score type: `evalue` (default) or `TM`. Only valid with `-t foldseek`                    |
+| `-m, --tm_mode <MODE>` | TM aggregation mode: `min` (default), `max`, or `mean`. Used by USalign and Foldseek with `-s TM` |
+| `-c, --conf <PATH>`    | Configuration file (CLI arguments override config values)                                         |
+| `-w, --workers <N>`    | Number of parallel threads for structure downloads (default: `10`)                                |
+| `-v, --verbose`        | Enable debug-level logging                                                                        |
+| `-q, --quiet`          | Suppress all output except errors                                                                 |
 
 ### Input File Formats
 
@@ -233,6 +234,15 @@ Configuration files use the format `-key value`, one per line:
 -workers 20
 -out results/my_output.clans
 -verbose
+```
+
+To use a local CIF database instead of AlphaFold downloads:
+
+```conf
+-load examples/small_fasta_files/5.fasta
+-input_type fasta
+-tool foldseek
+-structures_db /path/to/your/cif_database
 ```
 
 Use with: `3dclans -c config.conf`
@@ -309,6 +319,9 @@ Use higher values on fast networks for large inputs. If the AlphaFold API rate-l
 
 # Write to a directory (filename auto-derived from input)
 3dclans -l proteins.fasta -i fasta -t foldseek -o results/
+
+# Use a local CIF database instead of downloading from AlphaFold
+3dclans -l proteins.fasta -i fasta -t foldseek --structures_db /path/to/cif_database
 ```
 
 ### Output
@@ -322,7 +335,7 @@ output/clans_files/
 work/
 ├── cleaned_input_storage/
 │   └── <input_name>_cleaned.fasta # FASTA with only successfully downloaded structures
-├── structures/                    # Downloaded AlphaFold CIF files
+├── structures/                    # Working CIF files from AlphaFold or a local database
 │   ├── P49811.cif
 │   ├── Q02346.cif
 │   └── ...

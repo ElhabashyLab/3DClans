@@ -1,5 +1,6 @@
 """Unit tests for clans3d.utils.structure_utils."""
 import os
+import shutil
 from concurrent.futures import Future
 import pytest
 import pandas as pd
@@ -16,6 +17,7 @@ from clans3d.utils.structure_utils import (
     download_alphafold_structure,
     extract_region_of_protein,
     fetch_structures,
+    prepare_structures_from_local_db,
 )
 
 MODULE = "clans3d.utils.structure_utils"
@@ -241,6 +243,75 @@ class TestFetchStructures:
              patch(f"{MODULE}.process_fasta_file", return_value={}):
             fetch_structures(small_fasta_path, InputFileType.FASTA, str(tmp_path))
         mock_reset.assert_called_once_with(str(tmp_path))
+
+
+# ---------------------------------------------------------------------------
+# prepare_structures_from_local_db
+# ---------------------------------------------------------------------------
+
+class TestPrepareStructuresFromLocalDb:
+    def _count_residues(self, cif_path: str) -> int:
+        parser = MMCIFParser(QUIET=True)
+        structure = parser.get_structure("out", cif_path)
+        return sum(1 for _ in structure.get_residues())
+
+    def test_copies_available_structures_and_applies_regions(self, small_cif_path, tmp_path):
+        input_path = tmp_path / "input.fasta"
+        input_path.write_text(
+            ">sp|P11111|PROT1_HUMAN/2-4\nACDEFG\n"
+            ">sp|P22222|PROT2_MOUSE\nACDEFG\n"
+        )
+        structures_db = tmp_path / "structures_db"
+        structures_db.mkdir()
+        shutil.copy2(small_cif_path, structures_db / "P11111.cif")
+
+        output_dir = tmp_path / "structures_out"
+        result = prepare_structures_from_local_db(
+            str(input_path),
+            InputFileType.FASTA,
+            str(structures_db),
+            str(output_dir),
+        )
+
+        assert result == {"P11111": (2, 4)}
+        assert os.path.exists(output_dir / "P11111.cif")
+        assert not os.path.exists(output_dir / "P22222.cif")
+        assert self._count_residues(str(structures_db / "P11111.cif")) == 5
+        assert self._count_residues(str(output_dir / "P11111.cif")) == 3
+
+    def test_skips_missing_local_cif(self, small_cif_path, tmp_path):
+        input_path = tmp_path / "input.fasta"
+        input_path.write_text(
+            ">sp|P11111|PROT1_HUMAN\nACDEFG\n"
+            ">sp|P22222|PROT2_MOUSE\nACDEFG\n"
+        )
+        structures_db = tmp_path / "structures_db"
+        structures_db.mkdir()
+        shutil.copy2(small_cif_path, structures_db / "P11111.cif")
+
+        output_dir = tmp_path / "structures_out"
+        result = prepare_structures_from_local_db(
+            str(input_path),
+            InputFileType.FASTA,
+            str(structures_db),
+            str(output_dir),
+        )
+
+        assert result == {"P11111": None}
+        assert os.path.exists(output_dir / "P11111.cif")
+        assert not os.path.exists(output_dir / "P22222.cif")
+
+    def test_raises_for_unsupported_input_type(self, tmp_path):
+        structures_db = tmp_path / "structures_db"
+        structures_db.mkdir()
+        output_dir = tmp_path / "structures_out"
+        with pytest.raises(ValueError, match="Unsupported"):
+            prepare_structures_from_local_db(
+                "any.clans",
+                InputFileType.CLANS,
+                str(structures_db),
+                str(output_dir),
+            )
 
 
 # ---------------------------------------------------------------------------

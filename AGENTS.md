@@ -34,7 +34,7 @@ Input file (FASTA / A2M / A3M / TSV)
   Parse UniProt accessions & optional region annotations
         │
         ▼
-  Download AlphaFold CIF structures (parallel, 10 workers default)
+    Download AlphaFold CIF structures or copy from a local CIF database (parallel, 10 workers default)
         │
         ▼
   All-vs-all structural similarity  ← Foldseek (evalue or TM) | USalign
@@ -216,6 +216,7 @@ See [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) for a full table of what ea
 | `-l / --load`       | any path                  | path to the input file                                                        |
 | `-i / --input_type` | `fasta` `a2m` `a3m` `tsv` | must match file extension                                                     |
 | `-t / --tool`       | `foldseek` `USalign`      | case-sensitive                                                                |
+| `--structures_db`   | path                      | optional local CIF database; files must be named `<UniProtAccession>.cif`     |
 | `-o / --out`        | path                      | output file path or directory (default `output/clans_files/`)                 |
 | `-s / --score`      | `evalue` `TM`             | Foldseek only; default `evalue`                                               |
 | `--tm_mode`         | `min` `max` `mean`        | TM aggregation mode; default `min`; used by USalign and Foldseek with `-s TM` |
@@ -245,6 +246,9 @@ See [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) for a full table of what ea
 # Custom output path (file or directory)
 3dclans -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -o results/my_output.clans
 3dclans -l examples/small_fasta_files/5.fasta -i fasta -t foldseek -o results/
+
+# Use a local CIF database instead of AlphaFold downloads
+3dclans -l examples/small_fasta_files/5.fasta -i fasta -t foldseek --structures_db /path/to/cif_database
 
 # Config file
 3dclans -c examples/config_files/example.conf
@@ -278,7 +282,7 @@ Each step is a separate public method, so benchmarking tools can time them indep
 
 | Step | Method                     | Description                                                                    |
 | ---- | -------------------------- | ------------------------------------------------------------------------------ | ------ |
-| 1    | `fetch_structures()`       | Download AlphaFold CIF files; returns `{uid: region                            | None}` |
+| 1    | `fetch_structures()`       | Download AlphaFold CIF files or prepare local CIFs; returns `{uid: region      | None}` |
 | 2    | `generate_cleaned_fasta()` | Build cleaned FASTA for successfully downloaded structures                     |
 | 3    | `compute_scores()`         | Run similarity tool; returns DataFrame `[Sequence_ID_1, Sequence_ID_2, score]` |
 | 4    | `generate_clans_file()`    | Write `.clans` file; returns output path                                       |

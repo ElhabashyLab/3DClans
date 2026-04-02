@@ -193,3 +193,34 @@ class TestPipelineMockedTSV:
         _, fasta_path = self._run_mocked(tsv_pipeline)
         assert os.path.isfile(fasta_path)
         assert fasta_path.endswith(".fasta")
+
+
+class TestPipelineMockedLocalStructuresDb:
+    def test_run_uses_local_structures_db_branch(self, pipeline, tmp_path):
+        structures_db = tmp_path / "structures_db"
+        structures_db.mkdir()
+        config = PipelineConfig(
+            input_file=SMALL_FASTA,
+            input_type=InputFileType.FASTA,
+            tool=ToolType.FOLDSEEK,
+            structures_dir=str(tmp_path / "structures"),
+            output_dir=str(tmp_path / "output"),
+            cleaned_input_storage=str(tmp_path / "cleaned"),
+            structures_db=str(structures_db),
+        )
+        local_pipeline = ClansPipeline(config)
+        with (
+            patch(
+                "clans3d.core.pipeline.prepare_structures_from_local_db",
+                return_value=MOCK_UIDS_WITH_REGIONS,
+            ) as mock_prepare,
+            patch("clans3d.core.pipeline.fetch_structures") as mock_download,
+            patch("clans3d.core.pipeline.StructSimComputer") as MockComputer,
+        ):
+            MockComputer.return_value.run.return_value = MOCK_SCORES
+            clans_path, fasta_path = local_pipeline.run()
+
+        assert os.path.isfile(clans_path)
+        assert os.path.isfile(fasta_path)
+        mock_prepare.assert_called_once()
+        mock_download.assert_not_called()

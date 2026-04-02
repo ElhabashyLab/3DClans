@@ -1,5 +1,6 @@
 import logging
 import os
+from shutil import copy2
 import requests
 from typing import Literal
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -112,6 +113,190 @@ def _run_download_tasks(
     return uids_with_regions
 
 
+def _build_uid_region_tasks(
+    input_file_path: str,
+    input_file_type: InputFileType,
+) -> list[tuple[str, tuple[int, int] | None]]:
+    """
+    Parse input records into a list of (uid, region) tasks.
+
+    Extracts UniProt accessions and optional region annotations from the input file.
+    Logs warnings for any entries that fail to parse but continues processing.
+
+    Args:
+        input_file_path: Path to the input file (FASTA, A2M, A3M, or TSV).
+        input_file_type: Type of the input file.
+
+    Returns:
+        list of (uid, region) tuples. Region is None if not specified in the input.
+
+    Raises:
+        ValueError: If the input file type is not supported.
+    """
+    if input_file_type in (InputFileType.FASTA, InputFileType.A2M, InputFileType.A3M):
+        records = list(SeqIO.parse(input_file_path, "fasta"))
+        tasks: list[tuple[str, tuple[int, int] | None]] = []
+        for record in records:
+            try:
+                uid = extract_uid_from_recordID(record.id)
+                region = extract_region_from_record(record)
+                tasks.append((uid, region))
+            except ValueError as e:
+                logger.warning("Skipping entry '%s': %s", record.id, e)
+        return tasks
+
+    if input_file_type is InputFileType.TSV:
+        df = pd.read_csv(input_file_path, sep='\t')
+        tasks = []
+        for _, row in df.iterrows():
+            uid = row['entry']
+            try:
+                region = _parse_region_from_tsv_row(row)
+                tasks.append((uid, region))
+            except ValueError as e:
+                logger.warning("Skipping entry '%s': %s", uid, e)
+        return tasks
+
+    raise ValueError(f"Unsupported input file type: {input_file_type}")
+
+
+def _prepare_local_structure(
+    uid: str,
+    region: tuple[int, int] | None,
+    structures_db: str,
+    output_dir: str,
+) -> bool:
+    """
+    Copy a local CIF structure to the working directory and optionally trim it by region.
+
+    Copies a CIF file from the structures_db directory to the output directory.
+    If a region is specified, extracts only the requested residue range from the
+    copied structure file.
+
+    Args:
+        uid: UniProt accession (used to locate <uid>.cif in structures_db).
+        region: Residue range (start, end) to extract, 1-based inclusive. None keeps full structure.
+        structures_db: Directory containing source CIF files (<uid>.cif).
+        output_dir: Directory where the prepared structure is written.
+
+    Returns:
+        True if the structure was successfully prepared; False if copy, extraction, or cleanup failed.
+    """
+    source_path = os.path.join(structures_db, f"{uid}.cif")
+    target_path = os.path.join(output_dir, f"{uid}.cif")
+
+    if not os.path.exists(source_path):
+        logger.warning("Skipping entry '%s': local CIF not found at %s", uid, source_path)
+        return False
+
+    try:
+        copy2(source_path, target_path)
+    except OSError as e:
+        logger.warning("Skipping entry '%s': could not copy local CIF from %s: %s", uid, source_path, e)
+        return False
+
+    if region is not None:
+        try:
+            extract_region_of_protein(target_path, region, target_path)
+        except Exception as e:
+            logger.warning("Skipping entry '%s': could not extract region %s from local CIF: %s", uid, region, e)
+            try:
+                os.remove(target_path)
+            except OSError:
+                pass
+            return False
+
+    return True
+
+
+def _collect_prepared_structures(
+    futures_to_indices: dict,
+    tasks: list[tuple[str, tuple[int, int] | None]],
+) -> dict[str, tuple[int, int] | None]:
+    """
+    Collect results from parallel local structure preparation tasks.
+
+    Processes futures from a ThreadPoolExecutor submission dict, maps results back to
+    (uid, region) pairs, tracks success/failure, and logs a summary.
+
+    Args:
+        futures_to_indices: Mapping of Future objects to their index in the task list.
+        tasks: Original task list of (uid, region) tuples.
+
+    Returns:
+        Dictionary mapping successfully prepared UIDs to their regions.
+    """
+    total = len(tasks)
+    interval = _log_interval(total)
+    results: list[bool | None] = [None] * total
+    successful = 0
+    completed = 0
+
+    for future in as_completed(futures_to_indices):
+        idx = futures_to_indices[future]
+        results[idx] = future.result()
+        if results[idx]:
+            successful += 1
+        completed += 1
+        if completed % interval == 0 or completed == total:
+            logger.info("Preparing local structures %d/%d...", completed, total)
+
+    uids_with_regions: dict[str, tuple[int, int] | None] = {}
+    for idx, (uid, region) in enumerate(tasks):
+        if results[idx]:
+            uids_with_regions[uid] = region
+
+    failed = total - successful
+    logger.info(
+        "Prepared %d/%d local structure files (%d failed).",
+        successful,
+        total,
+        failed,
+    )
+    return uids_with_regions
+
+
+def prepare_structures_from_local_db(
+    input_file_path: str,
+    input_file_type: InputFileType,
+    structures_db: str,
+    output_dir: str,
+    max_workers: int = 10,
+) -> dict[str, tuple[int, int] | None]:
+    """
+    Prepare local CIF structures for the pipeline.
+
+    Parses the input file to extract UniProt accessions and optional region annotations.
+    Copies matching CIF files from ``structures_db`` into ``output_dir`` and optionally
+    trims them to the requested region. Preparation runs in parallel using a thread pool.
+
+    The input file remains the source of truth for UIDs and optional regions.
+    Matching CIF files must be named ``<uid>.cif`` in the structures_db directory.
+
+    Args:
+        input_file_path: Path to input file (FASTA, A2M, A3M, or TSV).
+        input_file_type: Type of the input file.
+        structures_db: Directory containing source CIF files (<uid>.cif).
+        output_dir: Directory where prepared structures are written (will be reset).
+        max_workers: Number of parallel preparation threads (default: 10).
+
+    Returns:
+        Dictionary mapping successfully prepared UIDs to their regions.
+        UIDs for which the CIF was not found or region extraction failed are excluded.
+    """
+    reset_dir_content(output_dir)
+    tasks = _build_uid_region_tasks(input_file_path, input_file_type)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {
+            executor.submit(_prepare_local_structure, uid, region, structures_db, output_dir): idx
+            for idx, (uid, region) in enumerate(tasks)
+        }
+        uids_with_regions = _collect_prepared_structures(future_to_index, tasks)
+
+    return uids_with_regions
+
+
 def fetch_structures(
     input_file_path: str,
     input_file_type: InputFileType,
@@ -119,21 +304,26 @@ def fetch_structures(
     max_workers: int = 10,
 ) -> dict[str, tuple[int, int] | None]:
     """
-    Fetches and stores structure files, specified in a given input_file in a output directory.
-    The contents of the output dir will be overwritten.
-    It returns a dict containing {uid : (region_start, region_end)} of the sequences that have been successfully downloaded.
-    Threading is used to speed up the process of downloading and region extraction.
-    ``max_workers`` controls the pool size
-    
+    Download AlphaFold structures for sequences in an input file.
+
+    Parses the input file (FASTA, A2M, A3M, or TSV) to extract UniProt accessions and
+    optional region annotations, then downloads matching AlphaFold CIF structures and
+    optionally trims them by region. The output directory is reset before download.
+    Downloads and region extraction run in parallel using a thread pool.
+
     Args:
         input_file_path: Path to the input file.
-        input_file_type: Specifies the type of the input file.
-        output_dir: The directory where the downloaded structures are stored.
-        max_workers: Maximum number of concurrent download threads (default: 10).
-        
+        input_file_type: Type of the input file (FASTA, A2M, A3M, or TSV).
+        output_dir: Directory where downloaded structures are stored (will be reset).
+        max_workers: Number of concurrent download threads (default: 10).
+
     Returns:
-        dict (str, tuple[int, int] | None): Containing downloaded uids together with their regions.
-    """    
+        Dictionary mapping successfully downloaded UIDs to their regions.
+        Region values are None if not specified in the input file.
+
+    Raises:
+        ValueError: If the input file type is unsupported.
+    """
     reset_dir_content(output_dir)
     if input_file_type in (InputFileType.FASTA, InputFileType.A2M, InputFileType.A3M):
         return process_fasta_file(input_file_path, output_dir, max_workers=max_workers)
@@ -145,67 +335,44 @@ def fetch_structures(
 
 def process_fasta_file(input_file_path: str, output_dir: str, max_workers: int = 10) -> dict:
     """
-    Downloads the structures of the sequences in the given fasta_file.
-    It also creates a dictionary with an entry for each downloaded record: {uid : region}
-    The region can be None if not specified in the header of the fasta records.
+    Download AlphaFold structures for sequences in a FASTA file.
 
-    Downloads and region extraction run concurrently (``max_workers`` threads).
-    Results are collected in order of completion; progress is logged from
-    the main thread so no locking is needed.
+    Parses the FASTA file to extract UniProt accessions and optional region annotations,
+    then downloads matching AlphaFold CIF structures and optionally trims them by region.
+    Downloads and region extraction run concurrently using a thread pool.
 
     Args:
-        input_file_path (str): Path to fasta file.
-        output_dir (str): Directory in which to save the downloaded structures.
-        max_workers (int): Number of concurrent download threads (default: 10).
+        input_file_path: Path to FASTA file.
+        output_dir: Directory in which to save the downloaded structures.
+        max_workers: Number of concurrent download threads (default: 10).
 
     Returns:
-        dict: Containing downloaded uids together with their regions.
+        Dictionary mapping successfully downloaded UIDs to their regions.
+        Region values are None if not specified in the FASTA header.
     """
-    records = list(SeqIO.parse(input_file_path, "fasta"))
-
-    # Parse all (uid, region) pairs first so we can report skips before submitting
-    tasks: list[tuple[str, tuple[int, int] | None]] = []
-    for record in records:
-        try:
-            uid = extract_uid_from_recordID(record.id)
-            region = extract_region_from_record(record)
-            tasks.append((uid, region))
-        except ValueError as e:
-            logger.warning("Skipping entry '%s': %s", record.id, e)
-
+    tasks = _build_uid_region_tasks(input_file_path, InputFileType.FASTA)
     return _run_download_tasks(tasks, output_dir, max_workers=max_workers)
 
 
 def process_tsv_file(input_file_path: str, output_dir: str, max_workers: int = 10) -> dict:
     """
-    Downloads the structures of the uids in the given tsv file.
-    It also creates a dictionary with an entry for each downloaded record. {uid : [region]}
-    The tsv file should contain the columns [entry, region_start, region_end].
+    Download AlphaFold structures for UIDs in a TSV file.
 
-    Downloads and region extraction run concurrently (``max_workers`` threads).
-    Results are collected in order of completion; progress is logged from
-    the main thread so no locking is needed.
+    Parses the TSV file to extract UniProt accessions and optional region annotations
+    (columns: entry, region_start, region_end), then downloads matching AlphaFold CIF
+    structures and optionally trims them by region. Downloads and region extraction
+    run concurrently using a thread pool.
 
     Args:
-        input_file_path (str): Path to tsv file.
-        output_dir (str): Directory in which to save the downloaded structures.
-        max_workers (int): Number of concurrent download threads (default: 10).
+        input_file_path: Path to TSV file with columns [entry, region_start, region_end].
+        output_dir: Directory in which to save the downloaded structures.
+        max_workers: Number of concurrent download threads (default: 10).
 
     Returns:
-        dict: Containing downloaded records together with their regions.
+        Dictionary mapping successfully downloaded UIDs to their regions.
+        Region values are None if not specified in the TSV file.
     """
-    df = pd.read_csv(input_file_path, sep='\t')
-
-    # Parse all (uid, region) pairs first so we can report skips before submitting
-    tasks: list[tuple[str, tuple[int, int] | None]] = []
-    for _, row in df.iterrows():
-        uid = row['entry']
-        try:
-            region = _parse_region_from_tsv_row(row)
-            tasks.append((uid, region))
-        except ValueError as e:
-            logger.warning("Skipping entry '%s': %s", uid, e)
-
+    tasks = _build_uid_region_tasks(input_file_path, InputFileType.TSV)
     return _run_download_tasks(tasks, output_dir, max_workers=max_workers)
 
 
@@ -215,19 +382,20 @@ def download_alphafold_structure(
     region: tuple[int, int] | None,
 ) -> bool:
     """
-    Downloads the AlphaFold-predicted CIF structure for a given accession and saves
-    it to the output directory. If a region is provided, the structure is trimmed to
-    that residue range after download.
+    Download an AlphaFold-predicted CIF structure and optionally extract a region.
+
+    Queries the AlphaFold DB REST API for the given accession, downloads the CIF file,
+    and optionally trims it to the specified residue range.
 
     Args:
-        accession_id (str): UniProt accession of the structure to download.
-        output_dir (str): Directory where the structure file will be saved.
-        region (tuple[int, int] | None): Residue range (start, end) to extract
-            (1-based, inclusive). Pass None to keep the full structure.
+        accession_id: UniProt accession of the structure to download.
+        output_dir: Directory where the structure file will be saved.
+        region: Residue range (start, end) to extract, 1-based inclusive.
+            Pass None to keep the full structure.
 
     Returns:
-        bool: True if the structure was successfully downloaded (and trimmed),
-              False otherwise.
+        True if the structure was successfully downloaded (and optionally trimmed),
+        False if the download or region extraction failed.
     """
     logger.debug("Downloading structure for %s with region: %s", accession_id, region)
     cif_url = _fetch_alphafold_cif_url(accession_id)
@@ -243,16 +411,18 @@ def download_alphafold_structure(
 
 def extract_region_of_protein(path_to_protein: str, region: tuple[int, int], output_path: str | None = None) -> str:
     """
-    Extracts a specific residue range from a CIF structure file and writes the
-    filtered structure to a file.
+    Extract a residue range from a CIF structure file.
+
+    Parses a CIF structure, filters residues to the specified range, and writes
+    the trimmed structure to an output file.
 
     Args:
-        path_to_protein (str): Path to the input CIF structure file.
-        region (tuple[int, int]): (start, end) residue indices to extract (1-based, inclusive).
-        output_path (str, optional): Destination path. Defaults to the input path with a '_roi' suffix.
+        path_to_protein: Path to the input CIF structure file.
+        region: Residue range (start, end) to extract, 1-based inclusive.
+        output_path: Destination path. If None, appends '_roi' suffix to the input path.
 
     Returns:
-        str: Path to the written output file.
+        Path to the written output file.
     """
     logger.debug("Extracting region %s from protein file: %s", region, path_to_protein)
     class SelectRegion(Select):

@@ -21,7 +21,7 @@ from clans3d.core.clans_file_generator import ClansFileGenerator
 from clans3d.similarity.struct_sim_computer import StructSimComputer
 from clans3d.similarity.tool_type import ToolType
 from clans3d.similarity.tm_mode import TmMode
-from clans3d.utils.structure_utils import fetch_structures
+from clans3d.utils.structure_utils import fetch_structures, prepare_structures_from_local_db
 from clans3d.utils.fasta_utils import (
     copy_records_from_fasta,
     generate_fasta_from_uids_with_regions,
@@ -49,6 +49,7 @@ class PipelineConfig:
         cleaned_input_storage: Directory for cleaned/intermediate input files.
         tool_working_dir: Base directory for similarity tool working files.
         download_workers: Maximum number of concurrent structure download threads. Default is 10.
+        structures_db: Optional directory containing local CIF structures named <uid>.cif.
         output_filename: Optional custom filename for the CLANS file.
             If ``None``, the name is derived from the cleaned FASTA basename.
     """
@@ -67,6 +68,7 @@ class PipelineConfig:
         cleaned_input_storage: str = os.path.join("work", "cleaned_input_storage"),
         tool_working_dir: str = "work",
         download_workers: int = 10,
+        structures_db: str | None = None,
         output_filename: str | None = None,
     ):
         self.input_file = input_file
@@ -81,6 +83,7 @@ class PipelineConfig:
         self.cleaned_input_storage = cleaned_input_storage
         self.tool_working_dir = tool_working_dir
         self.download_workers = download_workers
+        self.structures_db = structures_db
         self.output_filename = output_filename
 
 
@@ -112,6 +115,12 @@ class ClansPipeline:
         # validate input file exists
         if not os.path.exists(self.config.input_file):
             raise FileNotFoundError(f"Input file not found: {self.config.input_file}")
+
+        if self.config.structures_db is not None:
+            if not os.path.isdir(self.config.structures_db):
+                raise ValueError(
+                    f"structures_db must be an existing directory: {self.config.structures_db}"
+                )
         
         # check if input_type is compatible with input file extension
         allowed_extensions = {
@@ -145,14 +154,24 @@ class ClansPipeline:
         Raises:
             RuntimeError: If no structures could be downloaded.
         """
-        logger.info("Fetching structures from AlphaFold...")
         os.makedirs(self.config.structures_dir, exist_ok=True)
-        uids_with_regions = fetch_structures(
-            self.config.input_file,
-            self.config.input_type,
-            self.config.structures_dir,
-            max_workers=self.config.download_workers,
-        )
+        if self.config.structures_db is not None:
+            logger.info("Fetching structures from local database: %s", self.config.structures_db)
+            uids_with_regions = prepare_structures_from_local_db(
+                self.config.input_file,
+                self.config.input_type,
+                self.config.structures_db,
+                self.config.structures_dir,
+                max_workers=self.config.download_workers,
+            )
+        else:
+            logger.info("Fetching structures from AlphaFold...")
+            uids_with_regions = fetch_structures(
+                self.config.input_file,
+                self.config.input_type,
+                self.config.structures_dir,
+                max_workers=self.config.download_workers,
+            )
         if not uids_with_regions:
             raise RuntimeError(
                 "No structures could be downloaded. "

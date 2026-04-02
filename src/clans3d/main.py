@@ -29,6 +29,7 @@ def main():
         verbose=args.verbose,
         quiet=args.quiet,
         download_workers=args.workers,
+        structures_db=args.structures_db,
         output_dir=output_dir,
         output_filename=output_filename,
     )
